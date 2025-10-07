@@ -1,5 +1,0 @@
-2025-10-04T08:03:49.222+03:00  INFO 19676 --- [main] r.otus.hw.StockServiceApplicationTests   : Starting StockServiceApplicationTests using Java 17.0.13 with PID 19676 (started by Dmitry Belyaev in C:\IdeaProjects\OTUS\dz\2025-01-otus-spring-Belyaev\hw19\StockService)
-2025-10-04T08:03:49.224+03:00  INFO 19676 --- [main] r.otus.hw.StockServiceApplicationTests   : No active profile set, falling back to 1 default profile: "default"
-2025-10-04T08:03:50.708+03:00  INFO 19676 --- [main] o.s.cloud.context.scope.GenericScope     : BeanFactory id=3aaf9f37-eed0-31c4-87e3-d0cf006e477a
-2025-10-04T08:03:51.520+03:00  INFO 19676 --- [main] o.s.v.b.OptionalValidatorFactoryBean     : Failed to set up a Bean Validation provider: jakarta.validation.NoProviderFoundException: Unable to create a Configuration, because no Jakarta Bean Validation provider could be found. Add a provider like Hibernate Validator (RI) to your classpath.
-2025-10-04T08:03:52.457+03:00  INFO 19676 --- [main] r.otus.hw.StockServiceApplicationTests   : Started StockServiceApplicationTests in 4.14 seconds (process running for 5.908)

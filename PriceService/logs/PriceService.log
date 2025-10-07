@@ -1,8 +1,0 @@
-2025-10-04T08:04:00.690+03:00  INFO 17860 --- [main] r.otus.hw.PriceServiceApplicationTests   : Starting PriceServiceApplicationTests using Java 17.0.13 with PID 17860 (started by Dmitry Belyaev in C:\IdeaProjects\OTUS\dz\2025-01-otus-spring-Belyaev\hw19\PriceService)
-2025-10-04T08:04:00.693+03:00  INFO 17860 --- [main] r.otus.hw.PriceServiceApplicationTests   : No active profile set, falling back to 1 default profile: "default"
-2025-10-04T08:04:02.076+03:00  INFO 17860 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
-2025-10-04T08:04:02.081+03:00  INFO 17860 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
-2025-10-04T08:04:02.364+03:00  INFO 17860 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 248 ms. Found 1 Redis repository interface.
-2025-10-04T08:04:02.694+03:00  INFO 17860 --- [main] o.s.cloud.context.scope.GenericScope     : BeanFactory id=4bc983a6-d271-32ca-805a-a29770036b2b
-2025-10-04T08:04:04.167+03:00  INFO 17860 --- [main] o.s.v.b.OptionalValidatorFactoryBean     : Failed to set up a Bean Validation provider: jakarta.validation.NoProviderFoundException: Unable to create a Configuration, because no Jakarta Bean Validation provider could be found. Add a provider like Hibernate Validator (RI) to your classpath.
-2025-10-04T08:04:05.213+03:00  INFO 17860 --- [main] r.otus.hw.PriceServiceApplicationTests   : Started PriceServiceApplicationTests in 5.359 seconds (process running for 7.146)
