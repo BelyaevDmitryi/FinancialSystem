@@ -1,0 +1,6 @@
+server:
+  port: 8004
+
+tbank:
+  token: ${TBANK_TOKEN}
+

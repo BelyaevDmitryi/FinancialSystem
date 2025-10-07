@@ -1,0 +1,26 @@
+server:
+  port: 8003
+
+api :
+  stockConfig :
+    stockService : http://localhost:8002
+    getPrices : /stocks/prices
+
+spring:
+  application:
+    name: price-service
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+
+logging:
+  level:
+    root: INFO
+  file:
+    name: logs/PriceService.log
+
+springdoc:
+  api-docs:
+    path: /api-docs

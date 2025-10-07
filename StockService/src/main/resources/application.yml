@@ -1,0 +1,22 @@
+server:
+  port: 8002
+
+spring:
+  application:
+    name: stock-service
+
+api:
+  tinkoffConfig:
+    tinkoffService: http://localhost:8004
+    getStocksByTickers: /stocks/getStocksByTickers
+    getPrices: /prices
+
+springdoc:
+  api-docs:
+    path: /api-docs
+
+logging:
+  level:
+    root : INFO
+  file:
+    name: logs/StockService.log

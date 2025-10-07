@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  user-service:
+    build:
+      context: ./UserService
+      dockerfile: Dockerfile
+    container_name: user-service
+    ports:
+      - "8001:8001"
+      - "8091:8091"
+    environment:
+      SERVER_PORT: 8001
+      MANAGEMENT_SERVER_PORT: 8091
+      SPRING_DATA_MONGODB_HOST: mongodb
+      SPRING_DATA_MONGODB_PORT: 27017
+      SPRING_DATA_MONGODB_DATABASE: stockDB
+      API_PRICE_SERVICE_CONFIG_PRICE_SERVICE: http://localhost:8003
+      API_STOCK_CONFIG_STOCK_SERVICE: http://localhost:8002
+    depends_on:
+      - mongodb
+      - stock-service
+      - price-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  mongodb:
+    image: mongo:6.0
+    container_name: mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  tinkoff-stock-service:
+    build:
+      context: ./TinkoffStockService
+      dockerfile: Dockerfile
+    container_name: tinkoff-stock-service
+    ports:
+      - "8004:8004"
+    environment:
+      SERVER_PORT: 8004
+      STOCK_SERVICE_URL: http://localhost:8002
+    depends_on:
+      - stock-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  price-service:
+    build:
+      context: ./PriceService
+      dockerfile: Dockerfile
+    container_name: price-service
+    ports:
+      - "8003:8080"
+    environment:
+      SERVER_PORT: 8003
+      STOCK_SERVICE_URL: http://stock-service:8002
+    depends_on:
+      - stock-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7.0    # Или актуальная версия Redis
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  stock-service:
+    build:
+      context: ./StockService
+      dockerfile: Dockerfile
+    container_name: stock-service
+    ports:
+      - "8002:8002"
+    environment:
+      SERVER_PORT: 8002
+    depends_on:
+      - mongodb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis_data:
+  mongo_data:
