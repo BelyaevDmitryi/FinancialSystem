@@ -10,7 +10,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>ru.otus.hw</groupId>
+    <groupId>com.fs</groupId>
     <artifactId>SecurityService</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 
