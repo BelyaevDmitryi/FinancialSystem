@@ -15,6 +15,5 @@
         <module>StockService</module>
         <module>PriceService</module>
         <module>UserService</module>
-        <module>SecurityService</module>
     </modules>
 </project>
