@@ -4,9 +4,12 @@ server:
 spring:
   application:
     name: user-service
+  cloud:
+    loadbalancer:
+      enabled: true
   data:
     mongodb:
-      host: localhost
+      host: ${SPRING_DATA_MONGODB_HOST:localhost}
       port: 27017
       database: stockDB
     rest:
@@ -14,10 +17,10 @@ spring:
 
 api:
   priceServiceConfig:
-    priceService: http://localhost:8003
+    priceService: ${API_PRICE_SERVICE_CONFIG_PRICE_SERVICE:http://localhost:8003}
     getPricesByFigies: /prices
   stockConfig:
-    stockService: http://localhost:8002
+    stockService: ${API_STOCK_CONFIG_STOCK_SERVICE:http://localhost:8002}
     getStocksByTickers: /stocks/getByTickers
 
 springdoc:
@@ -44,6 +47,20 @@ management:
   health:
     defaults:
       enabled: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    hostname: user-service
+
+jwt:
+  secret: 5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437
+  expiration: 86400000  # 24 hours in milliseconds
 
 data:
   rest:

@@ -4,10 +4,23 @@ server:
 spring:
   application:
     name: stock-service
+  cloud:
+    loadbalancer:
+      enabled: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    hostname: stock-service
 
 api:
   tinkoffConfig:
-    tinkoffService: http://localhost:8004
+    tinkoffService: http://tinkoff-stock-service:8004
     getStocksByTickers: /stocks/getStocksByTickers
     getPrices: /prices
 

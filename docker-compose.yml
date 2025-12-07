@@ -1,6 +1,48 @@
 version: '3.8'
 
 services:
+  eureka-server:
+    build:
+      context: ./EurekaServer
+      dockerfile: Dockerfile
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    environment:
+      SERVER_PORT: 8761
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  api-gateway:
+    build:
+      context: ./ApiGateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8090:8090"
+    environment:
+      SERVER_PORT: 8090
+    depends_on:
+      eureka-server:
+        condition: service_started
+      user-service:
+        condition: service_started
+      stock-service:
+        condition: service_started
+      price-service:
+        condition: service_started
+      tinkoff-stock-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   user-service:
     build:
       context: ./UserService
@@ -15,12 +57,17 @@ services:
       SPRING_DATA_MONGODB_HOST: mongodb
       SPRING_DATA_MONGODB_PORT: 27017
       SPRING_DATA_MONGODB_DATABASE: stockDB
-      API_PRICE_SERVICE_CONFIG_PRICE_SERVICE: http://localhost:8003
-      API_STOCK_CONFIG_STOCK_SERVICE: http://localhost:8002
+      API_PRICE_SERVICE_CONFIG_PRICE_SERVICE: http://price-service:8003
+      API_STOCK_CONFIG_STOCK_SERVICE: http://stock-service:8002
     depends_on:
-      - mongodb
-      - stock-service
-      - price-service
+      eureka-server:
+        condition: service_started
+      mongodb:
+        condition: service_started
+      stock-service:
+        condition: service_started
+      price-service:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/actuator/health"]
       interval: 30s
@@ -35,6 +82,12 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
   tinkoff-stock-service:
     build:
@@ -45,11 +98,14 @@ services:
       - "8004:8004"
     environment:
       SERVER_PORT: 8004
-      STOCK_SERVICE_URL: http://localhost:8002
+      STOCK_SERVICE_URL: http://stock-service:8002
     depends_on:
-      - stock-service
+      eureka-server:
+        condition: service_started
+      stock-service:
+        condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8004/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -60,26 +116,35 @@ services:
       dockerfile: Dockerfile
     container_name: price-service
     ports:
-      - "8003:8080"
+      - "8003:8003"
     environment:
       SERVER_PORT: 8003
       STOCK_SERVICE_URL: http://stock-service:8002
     depends_on:
-      - stock-service
+      eureka-server:
+        condition: service_started
+      redis:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
 
   redis:
-    image: redis:7.0    # Или актуальная версия Redis
+    image: redis:7.0-alpine    # Или актуальная версия Redis
     container_name: redis
     restart: always
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   stock-service:
     build:
@@ -91,12 +156,16 @@ services:
     environment:
       SERVER_PORT: 8002
     depends_on:
-      - mongodb
+      eureka-server:
+        condition: service_started
+      mongodb:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
 
 volumes:
   redis_data:

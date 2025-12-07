@@ -11,6 +11,8 @@
     <packaging>pom</packaging>
 
     <modules>
+        <module>EurekaServer</module>
+        <module>ApiGateway</module>
         <module>TinkoffStockService</module>
         <module>StockService</module>
         <module>PriceService</module>

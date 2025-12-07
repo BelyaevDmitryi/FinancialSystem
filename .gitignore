@@ -1,1 +1,12 @@
 /.idea/
+/EurekaServer/target/
+/ApiGateway/target/
+/PriceService/target/
+/StockService/target/
+/TinkoffStockService/target/
+/UserService/target/
+/logs/
+/PriceService/logs/
+/StockService/src/
+/UserService/logs/
+/TinkoffStockService/logs/

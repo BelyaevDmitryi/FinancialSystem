@@ -1,6 +1,23 @@
 server:
   port: 8004
 
+spring:
+  application:
+    name: tinkoff-stock-service
+  cloud:
+    loadbalancer:
+      enabled: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    hostname: tinkoff-stock-service
+
 tbank:
   token: ${TBANK_TOKEN}
 

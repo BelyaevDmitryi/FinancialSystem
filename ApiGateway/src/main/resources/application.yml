@@ -1,0 +1,104 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        # User Service routes
+        - id: user-service-auth
+          uri: lb://user-service
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - StripPrefix=0
+
+        - id: user-service-users
+          uri: lb://user-service
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - StripPrefix=0
+
+        - id: user-service-stocks
+          uri: lb://user-service
+          predicates:
+            - Path=/api/stocks/**
+          filters:
+            - StripPrefix=0
+
+        - id: user-service-statistic
+          uri: lb://user-service
+          predicates:
+            - Path=/api/statistic/**
+          filters:
+            - StripPrefix=0
+
+        # Stock Service routes
+        - id: stock-service
+          uri: lb://stock-service
+          predicates:
+            - Path=/api/stock-service/**
+          filters:
+            - StripPrefix=1
+
+        # Price Service routes
+        - id: price-service
+          uri: lb://price-service
+          predicates:
+            - Path=/api/price-service/**
+          filters:
+            - StripPrefix=1
+
+        # Tinkoff Stock Service routes
+        - id: tinkoff-stock-service
+          uri: lb://tinkoff-stock-service
+          predicates:
+            - Path=/api/tinkoff/**
+          filters:
+            - StripPrefix=1
+
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, gateway
+  endpoint:
+    health:
+      show-details: always
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    hostname: api-gateway
+
+logging:
+  level:
+    root: INFO
+    org.springframework.cloud.gateway: DEBUG
+

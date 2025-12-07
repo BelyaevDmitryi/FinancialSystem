@@ -41,9 +41,12 @@ public class UserService {
 
         StocksDto stocksDto = stockApiService.getStocksByTickers(new TickersDto(notExistTickers));
         stockRepository.saveAll(stocksDto.getStocks());
-        User newUser = new User(userDtoCreate.getId(),
-                userDtoCreate.getName(),
-                userDtoCreate.getPortfolio());
+        User newUser = new User();
+        newUser.setId(userDtoCreate.getId());
+        newUser.setName(userDtoCreate.getName());
+        newUser.setPortfolio(userDtoCreate.getPortfolio());
+        newUser.setPassword(null); // Password will be set during signup
+        newUser.setRoles(new HashSet<>());
         return userRepository.save(newUser);
     }
 

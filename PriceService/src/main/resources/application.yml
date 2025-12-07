@@ -3,15 +3,18 @@ server:
 
 api :
   stockConfig :
-    stockService : http://localhost:8002
+    stockService : http://stock-service:8002
     getPrices : /stocks/prices
 
 spring:
   application:
     name: price-service
+  cloud:
+    loadbalancer:
+      enabled: true
   data:
     redis:
-      host: localhost
+      host: redis
       port: 6379
       database: 0
 
@@ -20,6 +23,16 @@ logging:
     root: INFO
   file:
     name: logs/PriceService.log
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    hostname: price-service
 
 springdoc:
   api-docs:
