@@ -11,12 +11,21 @@ spring:
 eureka:
   client:
     service-url:
-      defaultZone: http://eureka-server:8761/eureka/
+      defaultZone: http://localhost:8761/eureka/
     register-with-eureka: true
     fetch-registry: true
   instance:
     prefer-ip-address: true
     hostname: stock-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
 
 api:
   tinkoffConfig:
@@ -31,5 +40,6 @@ springdoc:
 logging:
   level:
     root : INFO
+    org.springframework.cloud.gateway: DEBUG
   file:
     name: logs/StockService.log
