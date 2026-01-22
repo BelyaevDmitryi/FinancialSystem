@@ -4,7 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.fs.domain.Position;
+import com.fs.domain.Stock;
 import com.fs.domain.User;
+import com.fs.dto.PositionWithStockDto;
 import com.fs.dto.PositionsDto;
 import com.fs.dto.StocksDto;
 import com.fs.dto.TickersDto;
@@ -14,6 +16,7 @@ import com.fs.exception.UserNotFoundException;
 import com.fs.repository.StockRepository;
 import com.fs.repository.UserRepository;
 
+import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -87,6 +90,27 @@ public class UserService {
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
+    }
+
+    public Long getTotalUsersCount() {
+        return userRepository.count();
+    }
+
+    public List<PositionWithStockDto> getUserPositions(String userId) {
+        User user = getUserById(userId);
+        return user.getPortfolio().stream()
+                .map(position -> {
+                    Stock stock = stockRepository.findByTicker(position.getTicker())
+                            .orElseThrow(() -> new RuntimeException("Stock not found for ticker: " + position.getTicker()));
+                    return new PositionWithStockDto(
+                            stock.getFigi(),
+                            stock.getTicker(),
+                            stock.getName(),
+                            BigDecimal.valueOf(position.getQuantity()),
+                            stock.getCurrency().name()
+                    );
+                })
+                .collect(Collectors.toList());
     }
 
 }

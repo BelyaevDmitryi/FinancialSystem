@@ -6,16 +6,20 @@
 
     <groupId>com.fs</groupId>
     <artifactId>FinancialSystem</artifactId>
-    <version>${revision}</version>
+    <version>1.0.0-SNAPSHOT</version>
 
     <packaging>pom</packaging>
 
     <modules>
         <module>EurekaServer</module>
         <module>ApiGateway</module>
-        <module>TinkoffStockService</module>
-        <module>StockService</module>
+        <module>BrokerIntegrationService</module>
         <module>PriceService</module>
         <module>UserService</module>
+        <module>AnalyticsService</module>
+        <module>TradingTerminalService</module>
+        <module>TradingBotService</module>
+        <module>AdminPanelService</module>
+        <module>DashboardService</module>
     </modules>
 </project>

@@ -1,6 +1,0 @@
-2025-12-07T07:12:00.936+03:00  INFO 28824 --- [stock-service] [main] com.fs.StockServiceApplicationTests      : Starting StockServiceApplicationTests using Java 17.0.13 with PID 28824 (started by Dmitry Belyaev in C:\IdeaProjects\Experiments\FinancialSystem\StockService)
-2025-12-07T07:12:00.939+03:00  INFO 28824 --- [stock-service] [main] com.fs.StockServiceApplicationTests      : No active profile set, falling back to 1 default profile: "default"
-2025-12-07T07:12:02.494+03:00  INFO 28824 --- [stock-service] [main] o.s.cloud.context.scope.GenericScope     : BeanFactory id=799b82b1-9466-342b-8a00-0cbb2b805e24
-2025-12-07T07:12:03.355+03:00  INFO 28824 --- [stock-service] [main] o.s.v.b.OptionalValidatorFactoryBean     : Failed to set up a Bean Validation provider: jakarta.validation.NoProviderFoundException: Unable to create a Configuration, because no Jakarta Bean Validation provider could be found. Add a provider like Hibernate Validator (RI) to your classpath.
-2025-12-07T07:12:05.229+03:00  INFO 28824 --- [stock-service] [main] o.s.cloud.commons.util.InetUtils         : Cannot determine local hostname
-2025-12-07T07:12:05.290+03:00  INFO 28824 --- [stock-service] [main] com.fs.StockServiceApplicationTests      : Started StockServiceApplicationTests in 6.306 seconds (process running for 8.442)

@@ -1,11 +1,6 @@
 server:
   port: 8003
 
-api :
-  stockConfig :
-    stockService : http://stock-service:8002
-    getPrices : /stocks/prices
-
 spring:
   application:
     name: price-service
@@ -31,9 +26,16 @@ eureka:
       defaultZone: http://eureka-server:8761/eureka/
     register-with-eureka: true
     fetch-registry: true
+    healthcheck:
+      enabled: true
   instance:
-    prefer-ip-address: true
+    prefer-ip-address: false
     hostname: price-service
+    status-page-url: http://localhost:8003/actuator/info
+    health-check-url: http://localhost:8003/actuator/health
+    home-page-url: http://localhost:8003/
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
 
 management:
   endpoints:
@@ -43,6 +45,12 @@ management:
   endpoint:
     health:
       show-details: always
+  info:
+    env:
+      enabled: true
+    app:
+      name: ${spring.application.name}
+      description: Price Service for Financial System
 
 springdoc:
   api-docs:

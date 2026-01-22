@@ -3,6 +3,7 @@ package com.fs.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import com.fs.domain.User;
+import com.fs.dto.PositionWithStockDto;
 import com.fs.dto.PositionsDto;
 import com.fs.dto.UserDtoCreate;
 import com.fs.service.UserService;
@@ -38,6 +39,16 @@ public class UserController {
     @GetMapping
     public List<User> getUsers() {
         return userService.getAllUsers();
+    }
+
+    @GetMapping("/count")
+    public Long getTotalUsersCount() {
+        return userService.getTotalUsersCount();
+    }
+
+    @GetMapping("/{id}/positions")
+    public List<PositionWithStockDto> getUserPositions(@PathVariable String id) {
+        return userService.getUserPositions(id);
     }
 
 }

@@ -13,6 +13,10 @@ import com.fs.exception.StockNotFoundException;
 import com.fs.feignclient.StockServiceClient;
 import com.fs.repository.StockRepository;
 
+import com.fs.dto.PriceDataDto;
+import com.fs.dto.FigiesDto;
+import com.fs.dto.StocksPricesDto;
+import com.fs.dto.StockPrice;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -89,10 +93,75 @@ public class StockPriceService {
 
     private List<StockWithPrice> getPricesFromApi(List<Stock> notFoundInRepo) {
         long start = System.currentTimeMillis();
-        StocksDto stocksDto = new StocksDto(notFoundInRepo);
-        StocksWithPrices stocksWithPrices = stockServiceClient.getPrices(stocksDto);
+        // Получаем FIGI из акций
+        List<String> figies = notFoundInRepo.stream()
+                .map(Stock::getFigi)
+                .toList();
+        
+        // Запрашиваем цены через BrokerIntegrationService
+        FigiesDto figiesDto = new FigiesDto(figies);
+        StocksPricesDto stocksPricesDto = stockServiceClient.getPrices(figiesDto);
+        
+        // Преобразуем результат в StockWithPrice
+        Map<String, BigDecimal> priceMap = stocksPricesDto.getPrices().stream()
+                .collect(Collectors.toMap(
+                        StockPrice::getFigi,
+                        StockPrice::getPrice
+                ));
+        
+        List<StockWithPrice> result = notFoundInRepo.stream()
+                .filter(stock -> priceMap.containsKey(stock.getFigi()))
+                .map(stock -> new StockWithPrice(stock, priceMap.get(stock.getFigi())))
+                .toList();
+        
         log.info("Time for getting from API - {}", System.currentTimeMillis() - start);
-        return stocksWithPrices.getStocks();
+        return result;
+    }
+    
+    /**
+     * Получить цены по списку FIGI (новый упрощенный метод)
+     */
+    public List<PriceDataDto> getPricesByFigies(List<String> figies) {
+        long start = System.currentTimeMillis();
+        List<PriceDataDto> result = new ArrayList<>();
+        
+        // Проверяем кеш в Redis
+        List<FigiWithPrice> fromRedis = stockRepository.findAllById(figies);
+        List<String> foundFigies = fromRedis.stream()
+                .map(FigiWithPrice::getFigi)
+                .toList();
+        
+        fromRedis.forEach(fwp -> result.add(new PriceDataDto(
+                fwp.getFigi(),
+                fwp.getPrice(),
+                java.time.LocalDateTime.now()
+        )));
+        
+        // Запрашиваем недостающие из API
+        List<String> notFoundFigies = figies.stream()
+                .filter(figi -> !foundFigies.contains(figi))
+                .toList();
+        
+        if (!notFoundFigies.isEmpty()) {
+            FigiesDto figiesDto = new FigiesDto(notFoundFigies);
+            StocksPricesDto stocksPricesDto = stockServiceClient.getPrices(figiesDto);
+            
+            // Сохраняем в кеш
+            List<FigiWithPrice> toSave = stocksPricesDto.getPrices().stream()
+                    .map(sp -> new FigiWithPrice(sp.getFigi(), sp.getPrice(), "TINKOFF"))
+                    .toList();
+            stockRepository.saveAll(toSave);
+            
+            // Добавляем в результат
+            stocksPricesDto.getPrices().forEach(sp -> result.add(new PriceDataDto(
+                    sp.getFigi(),
+                    sp.getPrice(),
+                    java.time.LocalDateTime.now()
+            )));
+        }
+        
+        log.info("Time for getting prices by figies - {} ms", System.currentTimeMillis() - start);
+        return result;
     }
 
     private void checkAllOk(List<Stock> inputStocks, List<StockWithPrice> result) {

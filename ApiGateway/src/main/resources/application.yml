@@ -40,14 +40,6 @@ spring:
           filters:
             - StripPrefix=0
 
-        # Stock Service routes
-        - id: stock-service
-          uri: lb://stock-service
-          predicates:
-            - Path=/api/stock-service/**
-          filters:
-            - StripPrefix=1
-
         # Price Service routes
         - id: price-service
           uri: lb://price-service
@@ -56,11 +48,51 @@ spring:
           filters:
             - StripPrefix=1
 
-        # Tinkoff Stock Service routes
-        - id: tinkoff-stock-service
-          uri: lb://tinkoff-stock-service
+        # Broker Integration Service routes
+        - id: broker-integration-service
+          uri: lb://broker-integration-service
           predicates:
-            - Path=/api/tinkoff/**
+            - Path=/api/broker/**
+          filters:
+            - StripPrefix=1
+
+        # Analytics Service routes
+        - id: analytics-service
+          uri: lb://analytics-service
+          predicates:
+            - Path=/api/analytics/**
+          filters:
+            - StripPrefix=1
+
+        # Trading Terminal Service routes
+        - id: trading-terminal-service
+          uri: lb://trading-terminal-service
+          predicates:
+            - Path=/api/orders/**
+          filters:
+            - StripPrefix=1
+
+        # Trading Bot Service routes
+        - id: trading-bot-service
+          uri: lb://trading-bot-service
+          predicates:
+            - Path=/api/bots/**
+          filters:
+            - StripPrefix=1
+
+        # Admin Panel Service routes
+        - id: admin-panel-service
+          uri: lb://admin-panel-service
+          predicates:
+            - Path=/api/admin/**
+          filters:
+            - StripPrefix=1
+
+        # Dashboard Service routes
+        - id: dashboard-service
+          uri: lb://dashboard-service
+          predicates:
+            - Path=/api/dashboard/**
           filters:
             - StripPrefix=1
 
@@ -93,12 +125,22 @@ eureka:
       defaultZone: http://eureka-server:8761/eureka/
     register-with-eureka: true
     fetch-registry: true
+    healthcheck:
+      enabled: true
   instance:
-    prefer-ip-address: true
+    prefer-ip-address: false
     hostname: api-gateway
+    status-page-url: http://localhost:8090/actuator/info
+    health-check-url: http://localhost:8090/actuator/health
+    home-page-url: http://localhost:8090/
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
 
 logging:
   level:
     root: INFO
     org.springframework.cloud.gateway: DEBUG
+
+jwt:
+  secret: 5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437
 

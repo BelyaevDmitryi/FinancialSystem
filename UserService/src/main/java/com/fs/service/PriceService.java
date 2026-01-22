@@ -1,55 +1,53 @@
 package com.fs.service;
 
-import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-import com.fs.config.ApiConfig;
 import com.fs.domain.Stock;
-import com.fs.dto.StocksDto;
+import com.fs.dto.PriceDataDto;
 import com.fs.exception.PriceServiceException;
+import com.fs.feignclient.PriceServiceClient;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class PriceService {
-    private final ApiConfig config;
-
-    private final RestTemplate restTemplate;
-
-    public PriceService(RestTemplateBuilder restTemplateBuilder, ApiConfig config) {
-        this.config = config;
-        this.restTemplate = restTemplateBuilder.build();
-    }
+    private final PriceServiceClient priceServiceClient;
 
     public Map<String, BigDecimal> getPricesByFigies(List<Stock> stocks) {
-        Map<String, BigDecimal> prices = new HashMap<>();
-        String url = config.getPriceServiceConfig().getPriceService() + config.getPriceServiceConfig().getGetPricesByFigies();
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+        if (stocks == null || stocks.isEmpty()) {
+            return new HashMap<>();
+        }
 
-        HttpEntity<StocksDto> entity = new HttpEntity<>(new StocksDto(stocks), headers);
+        List<String> figies = stocks.stream()
+                .map(Stock::getFigi)
+                .filter(figi -> figi != null && !figi.isEmpty())
+                .collect(Collectors.toList());
 
-        ResponseEntity<StocksDto> responseEntity
-                = this.restTemplate.postForEntity(url, entity, StocksDto.class);
+        if (figies.isEmpty()) {
+            return new HashMap<>();
+        }
 
-        if(responseEntity.getStatusCode() == HttpStatus.OK) {
-            StocksDto body = responseEntity.getBody();
-            if (body != null && body.getStocks() != null) {
-                body.getStocks().forEach(i -> prices.put(i.getFigi(), i.getPrice()));
+        try {
+            log.info("Getting prices for {} figies from PriceService", figies.size());
+            List<PriceDataDto> priceDataList = priceServiceClient.getPricesByFigies(figies);
+            
+            Map<String, BigDecimal> prices = new HashMap<>();
+            if (priceDataList != null) {
+                priceDataList.forEach(priceData -> 
+                    prices.put(priceData.getFigi(), priceData.getPrice())
+                );
             }
             return prices;
-        } else {
-            throw new PriceServiceException(responseEntity.toString());
+        } catch (Exception e) {
+            log.error("Error getting prices from PriceService: {}", e.getMessage());
+            throw new PriceServiceException("Failed to get prices: " + e.getMessage());
         }
     }
 }

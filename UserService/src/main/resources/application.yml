@@ -15,14 +15,6 @@ spring:
     rest:
       basePath: /datarest
 
-api:
-  priceServiceConfig:
-    priceService: ${API_PRICE_SERVICE_CONFIG_PRICE_SERVICE:http://localhost:8003}
-    getPricesByFigies: /prices
-  stockConfig:
-    stockService: ${API_STOCK_CONFIG_STOCK_SERVICE:http://localhost:8002}
-    getStocksByTickers: /stocks/getByTickers
-
 springdoc:
   api-docs:
     path: /api-docs
@@ -35,18 +27,22 @@ logging:
     name: logs/UserService.log
 
 management:
-  server:
-    port: 8091
   endpoints:
     web:
       exposure:
-        include: health, metrics, loggers
+        include: health, info, metrics, loggers
   endpoint:
     health:
       show-details: always
   health:
     defaults:
       enabled: true
+  info:
+    env:
+      enabled: true
+    app:
+      name: ${spring.application.name}
+      description: User Service for Financial System
 
 eureka:
   client:
@@ -54,9 +50,16 @@ eureka:
       defaultZone: http://eureka-server:8761/eureka/
     register-with-eureka: true
     fetch-registry: true
+    healthcheck:
+      enabled: true
   instance:
-    prefer-ip-address: true
+    prefer-ip-address: false
     hostname: user-service
+    status-page-url: http://localhost:8001/actuator/info
+    health-check-url: http://localhost:8001/actuator/health
+    home-page-url: http://localhost:8001/
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
 
 jwt:
   secret: 5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437

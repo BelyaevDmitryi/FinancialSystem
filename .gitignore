@@ -10,3 +10,4 @@
 /StockService/src/
 /UserService/logs/
 /TinkoffStockService/logs/
+.env

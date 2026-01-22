@@ -1,8 +1,6 @@
 package com.fs.config;
 
-import com.fs.security.jwt.AuthTokenFilter;
 import com.fs.security.UserDetailsServiceImpl;
-import com.fs.security.jwt.JwtUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,8 +14,12 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+/**
+ * Конфигурация безопасности для UserService.
+ * JWT валидация перенесена в ApiGateway для централизованной аутентификации.
+ * UserService отвечает только за генерацию токенов и управление пользователями.
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
@@ -25,14 +27,6 @@ public class SecurityConfig {
 
     @Autowired
     private UserDetailsServiceImpl userDetailsService;
-
-    @Autowired
-    private JwtUtils jwtUtils;
-
-    @Bean
-    public AuthTokenFilter authenticationJwtTokenFilter() {
-        return new AuthTokenFilter(jwtUtils, userDetailsService);
-    }
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
@@ -57,14 +51,11 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
-                        .anyRequest().authenticated()
+                        // Все запросы разрешены, так как валидация JWT происходит в ApiGateway
+                        .anyRequest().permitAll()
                 );
 
         http.authenticationProvider(authenticationProvider());
-        http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
