@@ -60,13 +60,13 @@ services:
     container_name: user-service
     ports:
       - "8001:8001"
-      - "8091:8091"
     environment:
       SERVER_PORT: 8001
-      MANAGEMENT_SERVER_PORT: 8091
-      SPRING_DATA_MONGODB_HOST: mongodb
-      SPRING_DATA_MONGODB_PORT: 27017
-      SPRING_DATA_MONGODB_DATABASE: stockDB
+      SPRING_DATASOURCE_HOST: postgres
+      SPRING_DATASOURCE_PORT: 5432
+      SPRING_DATASOURCE_DATABASE: userdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
       API_PRICE_SERVICE_CONFIG_PRICE_SERVICE: http://price-service:8003
       API_BROKER_CONFIG_BROKER_INTEGRATION_SERVICE: http://broker-integration-service:8004
     networks:
@@ -74,8 +74,8 @@ services:
     depends_on:
       eureka-server:
         condition: service_started
-      mongodb:
-        condition: service_started
+      postgres:
+        condition: service_healthy
       broker-integration-service:
         condition: service_started
       price-service:
@@ -86,20 +86,25 @@ services:
       timeout: 10s
       retries: 3
 
-  mongodb:
-    image: mongo:6.0
-    container_name: mongodb
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
     restart: always
     ports:
-      - "27017:27017"
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: financial_system
     networks:
       - financial-network
     volumes:
-      - mongo_data:/data/db
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
-      timeout: 10s
+      timeout: 5s
       retries: 5
       start_period: 40s
 
@@ -172,15 +177,10 @@ services:
       - "8005:8005"
     environment:
       SERVER_PORT: 8005
-      SPRING_DATA_MONGODB_HOST: mongodb
-      SPRING_DATA_MONGODB_PORT: 27017
-      SPRING_DATA_MONGODB_DATABASE: analyticsDB
     networks:
       - financial-network
     depends_on:
       eureka-server:
-        condition: service_started
-      mongodb:
         condition: service_started
       price-service:
         condition: service_started
@@ -199,16 +199,18 @@ services:
       - "8006:8006"
     environment:
       SERVER_PORT: 8006
-      SPRING_DATA_MONGODB_HOST: mongodb
-      SPRING_DATA_MONGODB_PORT: 27017
-      SPRING_DATA_MONGODB_DATABASE: tradingDB
+      SPRING_DATASOURCE_HOST: postgres
+      SPRING_DATASOURCE_PORT: 5432
+      SPRING_DATASOURCE_DATABASE: tradingdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
     networks:
       - financial-network
     depends_on:
       eureka-server:
         condition: service_started
-      mongodb:
-        condition: service_started
+      postgres:
+        condition: service_healthy
       price-service:
         condition: service_started
       user-service:
@@ -228,16 +230,18 @@ services:
       - "8007:8007"
     environment:
       SERVER_PORT: 8007
-      SPRING_DATA_MONGODB_HOST: mongodb
-      SPRING_DATA_MONGODB_PORT: 27017
-      SPRING_DATA_MONGODB_DATABASE: botDB
+      SPRING_DATASOURCE_HOST: postgres
+      SPRING_DATASOURCE_PORT: 5432
+      SPRING_DATASOURCE_DATABASE: botdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
     networks:
       - financial-network
     depends_on:
       eureka-server:
         condition: service_started
-      mongodb:
-        condition: service_started
+      postgres:
+        condition: service_healthy
       analytics-service:
         condition: service_started
       trading-terminal-service:
@@ -304,10 +308,28 @@ services:
       timeout: 10s
       retries: 3
 
+  frontend-service:
+    build:
+      context: ./FrontendService
+      dockerfile: Dockerfile
+    container_name: frontend-service
+    ports:
+      - "3000:80"
+    networks:
+      - financial-network
+    depends_on:
+      api-gateway:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 networks:
   financial-network:
     driver: bridge
 
 volumes:
   redis_data:
-  mongo_data:
+  postgres_data:

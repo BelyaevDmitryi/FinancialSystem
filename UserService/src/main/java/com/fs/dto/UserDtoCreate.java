@@ -9,7 +9,6 @@ import java.util.Set;
 @Value
 @AllArgsConstructor
 public class UserDtoCreate {
-    private String id;
     private String name;
     private Set<Position> portfolio;
 }

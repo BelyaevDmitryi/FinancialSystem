@@ -24,19 +24,33 @@ spring:
           predicates:
             - Path=/api/users/**
           filters:
-            - StripPrefix=0
+            - StripPrefix=1
 
         - id: user-service-stocks
           uri: lb://user-service
           predicates:
             - Path=/api/stocks/**
           filters:
-            - StripPrefix=0
+            - StripPrefix=1
 
         - id: user-service-statistic
           uri: lb://user-service
           predicates:
             - Path=/api/statistic/**
+          filters:
+            - StripPrefix=1
+
+        - id: user-service-profile
+          uri: lb://user-service
+          predicates:
+            - Path=/api/profile/**
+          filters:
+            - StripPrefix=0
+
+        - id: user-service-images
+          uri: lb://user-service
+          predicates:
+            - Path=/images/**
           filters:
             - StripPrefix=0
 
@@ -99,7 +113,7 @@ spring:
       globalcors:
         cors-configurations:
           '[/**]':
-            allowedOrigins: "*"
+            allowedOriginPatterns: "*"
             allowedMethods:
               - GET
               - POST

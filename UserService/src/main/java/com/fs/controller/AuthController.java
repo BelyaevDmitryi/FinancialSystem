@@ -29,15 +29,16 @@ public class AuthController {
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequestDto loginRequest) {
         String jwt = authService.authenticateUser(loginRequest);
         
-        User user = userRepository.findById(loginRequest.getUsername())
+        User user = userRepository.findByName(loginRequest.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         return ResponseEntity.ok(new JwtResponseDto(
                 jwt,
                 "Bearer",
-                user.getId(),
-                user.getId(),
-                user.getName()
+                String.valueOf(user.getId()),
+                user.getName(), // username (логин)
+                user.getNickname() != null ? user.getNickname() : user.getName(), // name (никнейм или логин по умолчанию)
+                user.getRoles().stream().toList()
         ));
     }
 

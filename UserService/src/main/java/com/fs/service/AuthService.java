@@ -7,6 +7,8 @@ import com.fs.exception.UserAlreadyExistException;
 import com.fs.repository.UserRepository;
 import com.fs.security.UserDetailsServiceImpl;
 import com.fs.security.jwt.JwtUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -22,6 +24,8 @@ import java.util.Set;
 @Service
 public class AuthService {
 
+    private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
+
     @Autowired
     private UserRepository userRepository;
 
@@ -36,24 +40,64 @@ public class AuthService {
 
     @Transactional
     public void registerUser(SignupRequestDto signupRequest) {
-        if (userRepository.existsById(signupRequest.getUsername())) {
+        logger.debug("Attempting to register user with username: {}", signupRequest.getUsername());
+        
+        String username = signupRequest.getUsername() != null && !signupRequest.getUsername().isEmpty() 
+                ? signupRequest.getUsername() 
+                : signupRequest.getName();
+        
+        if (username == null || username.isEmpty()) {
+            logger.warn("Registration failed: username is required");
+            throw new IllegalArgumentException("Username is required");
+        }
+        
+        if (signupRequest.getPassword() == null || signupRequest.getPassword().isEmpty()) {
+            logger.warn("Registration failed: password is required");
+            throw new IllegalArgumentException("Password is required");
+        }
+        
+        if (userRepository.existsByName(username)) {
+            logger.warn("Registration failed: username {} already exists", username);
             throw new UserAlreadyExistException("Error: Username is already taken!");
         }
 
-        User user = new User();
-        user.setId(signupRequest.getUsername());
-        user.setName(signupRequest.getName());
-        user.setPassword(passwordEncoder.encode(signupRequest.getPassword()));
-        
-        Set<String> roles = new HashSet<>();
-        roles.add("ROLE_USER");
-        user.setRoles(roles);
-        
-        if (user.getPortfolio() == null) {
-            user.setPortfolio(new HashSet<>());
-        }
+        try {
+            User user = new User();
+            user.setName(username);
+            user.setNickname(username); // По умолчанию nickname = username
+            String encodedPassword = passwordEncoder.encode(signupRequest.getPassword());
+            user.setPassword(encodedPassword);
+            
+            // Дефолтный аватар не устанавливаем - будет использоваться локальная картинка
+            user.setAvatarUrl(null);
+            
+            Set<String> roles = new HashSet<>();
+            roles.add("ROLE_USER");
+            user.setRoles(roles);
+            
+            // Portfolio инициализируется автоматически в конструкторе User
+            // Убедимся, что portfolio не null для корректной работы Hibernate
+            if (user.getPortfolio() == null) {
+                user.setPortfolio(new HashSet<>());
+            }
 
-        userRepository.save(user);
+            logger.debug("Saving user to database: username={}, hasRoles={}, hasPortfolio={}", 
+                    username, !user.getRoles().isEmpty(), user.getPortfolio() != null);
+            
+            User savedUser = userRepository.save(user);
+            logger.info("User {} registered successfully with id: {}", username, savedUser.getId());
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            logger.error("Data integrity violation while registering user {}: {}", username, e.getMessage(), e);
+            throw e;
+        } catch (jakarta.persistence.PersistenceException e) {
+            logger.error("Persistence error while registering user {}: {}", username, e.getMessage(), e);
+            throw new RuntimeException("Database error during registration: " + e.getMessage(), e);
+        } catch (Exception e) {
+            logger.error("Unexpected error registering user {}: {}", username, e.getMessage(), e);
+            logger.error("Exception type: {}, cause: {}", e.getClass().getName(), 
+                    e.getCause() != null ? e.getCause().getClass().getName() : "null");
+            throw new RuntimeException("Registration failed: " + e.getMessage(), e);
+        }
     }
 
     public String authenticateUser(LoginRequestDto loginRequest) {

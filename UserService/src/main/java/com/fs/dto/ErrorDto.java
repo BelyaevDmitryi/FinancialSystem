@@ -1,10 +1,14 @@
 package com.fs.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Value;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Value
-@AllArgsConstructor
+@Data
+@NoArgsConstructor
 public class ErrorDto {
     private String error;
+    
+    public ErrorDto(String error) {
+        this.error = error;
+    }
 }

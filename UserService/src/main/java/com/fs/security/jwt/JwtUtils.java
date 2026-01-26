@@ -1,5 +1,6 @@
 package com.fs.security.jwt;
 
+import com.fs.security.UserDetailsServiceImpl;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -54,7 +55,31 @@ public class JwtUtils {
 
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, userDetails.getUsername());
+        // Храним userId в subject токена для использования в микросервисах
+        String userId = String.valueOf(((UserDetailsServiceImpl.UserPrincipal) userDetails).getId());
+        
+        // Добавляем роли в claims
+        if (userDetails.getAuthorities() != null) {
+            claims.put("roles", userDetails.getAuthorities().stream()
+                    .map(auth -> auth.getAuthority())
+                    .toList());
+        }
+        
+        return createToken(claims, userId);
+    }
+    
+    public String extractUserId(String token) {
+        return extractClaim(token, Claims::getSubject);
+    }
+    
+    @SuppressWarnings("unchecked")
+    public java.util.List<String> extractRoles(String token) {
+        Claims claims = extractAllClaims(token);
+        Object rolesObj = claims.get("roles");
+        if (rolesObj instanceof java.util.List) {
+            return (java.util.List<String>) rolesObj;
+        }
+        return java.util.Collections.emptyList();
     }
 
     private String createToken(Map<String, Object> claims, String subject) {

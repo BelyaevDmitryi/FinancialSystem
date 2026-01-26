@@ -1,0 +1,58 @@
+server:
+  port: 8004
+
+spring:
+  application:
+    name: broker-integration-service
+  cloud:
+    loadbalancer:
+      enabled: true
+
+broker:
+  default: TINKOFF  # По умолчанию используется Tinkoff
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+    healthcheck:
+      enabled: true
+  instance:
+    prefer-ip-address: false
+    hostname: broker-integration-service
+    status-page-url: http://broker-integration-service:8004/actuator/info
+    health-check-url: http://broker-integration-service:8004/actuator/health
+    home-page-url: http://broker-integration-service:8004/
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+  info:
+    env:
+      enabled: true
+    app:
+      name: ${spring.application.name}
+      description: Broker Integration Service for Financial System
+
+tbank:
+  token: ${TBANK_TOKEN}
+
+springdoc:
+  api-docs:
+    path: /api-docs
+
+logging:
+  level:
+    root: INFO
+  file:
+    name: logs/BrokerIntegrationService.log
+

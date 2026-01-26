@@ -1,22 +1,42 @@
 package com.fs.domain;
 
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Data;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
+@Entity
+@Table(name = "stocks", uniqueConstraints = @UniqueConstraint(columnNames = "ticker"))
 @Data
-@Document(collection = "stocks")
+@NoArgsConstructor
+@AllArgsConstructor
 public class Stock {
     @Id
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    @Column(nullable = false, unique = true)
     private String ticker;
+    
+    @Column(unique = true)
     private String figi;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private Currency currency;
+    
+    @Column(nullable = false)
     private String name;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private Type type;
+    
+    @Column(nullable = false)
     private String source = "TINKOFF";
+    
     private BigDecimal price;
 
     public Stock(String ticker, String figi, Currency currency, String name, Type type, BigDecimal price, String source) {

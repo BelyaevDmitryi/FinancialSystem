@@ -28,14 +28,16 @@ public class TestConfig {
 
         // Mock admin user
         User adminUser = new User();
-        adminUser.setId("admin");
+        adminUser.setId(1L);
         adminUser.setName("Administrator");
         adminUser.setPassword(passwordEncoder().encode("admin123"));
         adminUser.getRoles().add("ROLE_ADMIN");
         adminUser.getRoles().add("ROLE_USER");
 
-        when(mockRepo.findById("admin")).thenReturn(Optional.of(adminUser));
-        when(mockRepo.existsById("admin")).thenReturn(true);
+        when(mockRepo.findById(1L)).thenReturn(Optional.of(adminUser));
+        when(mockRepo.existsById(1L)).thenReturn(true);
+        when(mockRepo.findByName("Administrator")).thenReturn(Optional.of(adminUser));
+        when(mockRepo.existsByName("Administrator")).thenReturn(true);
 
         // Mock save method
         when(mockRepo.save(any(User.class))).thenAnswer(invocation -> {

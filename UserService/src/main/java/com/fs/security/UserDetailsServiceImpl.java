@@ -23,19 +23,19 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     @Override
     @Transactional
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findById(username)
+        User user = userRepository.findByName(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User Not Found with username: " + username));
 
         return UserPrincipal.create(user);
     }
 
     public static class UserPrincipal implements UserDetails {
-        private String id;
+        private Long id;
         private String username;
         private String password;
         private Collection<? extends GrantedAuthority> authorities;
 
-        public UserPrincipal(String id, String username, String password,
+        public UserPrincipal(Long id, String username, String password,
                            Collection<? extends GrantedAuthority> authorities) {
             this.id = id;
             this.username = username;
@@ -50,13 +50,13 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
             return new UserPrincipal(
                     user.getId(),
-                    user.getId(),
+                    user.getName(),
                     user.getPassword(),
                     authorities
             );
         }
 
-        public String getId() {
+        public Long getId() {
             return id;
         }
 

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fs.config.TestConfig;
 import com.fs.dto.LoginRequestDto;
 import com.fs.dto.SignupRequestDto;
+import com.fs.domain.User;
 import com.fs.repository.UserRepository;
 import com.fs.security.jwt.JwtUtils;
 import org.springframework.context.annotation.Import;
@@ -56,18 +57,21 @@ public class AuthControllerTest {
         loginRequest.setUsername("testuser");
         loginRequest.setPassword("password123");
 
+        // Get the user ID before signin
+        User user = userRepository.findByName("testuser").orElseThrow();
+
         MvcResult result = mockMvc.perform(post("/api/auth/signin")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").isNotEmpty())
-                .andExpect(jsonPath("$.id").value("testuser"))
+                .andExpect(jsonPath("$.id").value(String.valueOf(user.getId())))
                 .andExpect(jsonPath("$.username").value("testuser"))
                 .andExpect(jsonPath("$.name").value("Test User"))
                 .andReturn();
 
         // Cleanup
-        userRepository.deleteById("testuser");
+        userRepository.deleteById(user.getId());
     }
 
     @Test
@@ -91,7 +95,8 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.message").value("Error: Username is already taken!"));
 
         // Cleanup
-        userRepository.deleteById("existinguser");
+        userRepository.findByName("existinguser")
+                .ifPresent(user -> userRepository.deleteById(user.getId()));
     }
 
     @Test

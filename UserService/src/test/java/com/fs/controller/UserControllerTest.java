@@ -7,6 +7,7 @@ import com.fs.dto.PositionsDto;
 import com.fs.dto.UserDtoCreate;
 import com.fs.repository.UserRepository;
 import com.fs.domain.Position;
+import com.fs.domain.User;
 import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,7 +62,7 @@ public class UserControllerTest {
         // Create and login as regular user
         // First, create the user
         Set<Position> portfolio = new HashSet<>();
-        UserDtoCreate userCreate = new UserDtoCreate("testuser", "Test User", portfolio);
+        UserDtoCreate userCreate = new UserDtoCreate("testuser", portfolio);
 
         mockMvc.perform(post("/users")
                 .header("Authorization", "Bearer " + adminToken)
@@ -77,7 +78,7 @@ public class UserControllerTest {
         // First signup to set the password
         mockMvc.perform(post("/api/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(new com.fs.dto.SignupRequestDto("testuser", "Test User", "password123"))))
+                .content(objectMapper.writeValueAsString(new com.fs.dto.SignupRequestDto("testuser", "testuser", "password123"))))
                 .andExpect(status().isOk());
 
         // Then login
@@ -94,37 +95,41 @@ public class UserControllerTest {
     @AfterEach
     public void cleanup() {
         // Clean up test user
-        userRepository.deleteById("testuser");
+        userRepository.findByName("testuser")
+                .ifPresent(user -> userRepository.deleteById(user.getId()));
     }
 
     @Test
     public void testGetUserById_AsAdmin() throws Exception {
-        mockMvc.perform(get("/users/testuser")
+        User user = userRepository.findByName("testuser").orElseThrow();
+        mockMvc.perform(get("/users/" + user.getId())
                 .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("testuser"))
-                .andExpect(jsonPath("$.name").value("Test User"));
+                .andExpect(jsonPath("$.id").value(user.getId()))
+                .andExpect(jsonPath("$.name").value("testuser"));
     }
 
     @Test
     public void testGetUserById_AsUser() throws Exception {
-        mockMvc.perform(get("/users/testuser")
+        User user = userRepository.findByName("testuser").orElseThrow();
+        mockMvc.perform(get("/users/" + user.getId())
                 .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("testuser"))
-                .andExpect(jsonPath("$.name").value("Test User"));
+                .andExpect(jsonPath("$.id").value(user.getId()))
+                .andExpect(jsonPath("$.name").value("testuser"));
     }
 
     @Test
     public void testGetUserById_Unauthorized() throws Exception {
-        mockMvc.perform(get("/users/testuser"))
+        User user = userRepository.findByName("testuser").orElseThrow();
+        mockMvc.perform(get("/users/" + user.getId()))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     public void testGetUserById_Forbidden() throws Exception {
         // Create another user
-        UserDtoCreate anotherUserCreate = new UserDtoCreate("anotheruser", "Another User", new HashSet<>());
+        UserDtoCreate anotherUserCreate = new UserDtoCreate("anotheruser", new HashSet<>());
 
         mockMvc.perform(post("/users")
                 .header("Authorization", "Bearer " + adminToken)
@@ -133,22 +138,24 @@ public class UserControllerTest {
                 .andExpect(status().isOk());
 
         // Try to access another user's data as a regular user
-        mockMvc.perform(get("/users/anotheruser")
+        User anotherUser = userRepository.findByName("anotheruser").orElseThrow();
+        mockMvc.perform(get("/users/" + anotherUser.getId())
                 .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isForbidden());
 
         // Clean up
-        userRepository.deleteById("anotheruser");
+        userRepository.deleteById(anotherUser.getId());
     }
 
     @Test
     public void testAddStocksToUser() throws Exception {
+        User user = userRepository.findByName("testuser").orElseThrow();
         Set<Position> positions = new HashSet<>();
         positions.add(new Position("AAPL", 10));
         PositionsDto positionsDto = new PositionsDto();
         positionsDto.setPositions(positions);
 
-        mockMvc.perform(put("/users/testuser/stocks")
+        mockMvc.perform(put("/users/" + user.getId() + "/stocks")
                 .header("Authorization", "Bearer " + userToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(positionsDto)))
@@ -160,7 +167,7 @@ public class UserControllerTest {
     @Test
     public void testDeleteUser() throws Exception {
         // Create a user to delete
-        UserDtoCreate userToDelete = new UserDtoCreate("userToDelete", "User To Delete", new HashSet<>());
+        UserDtoCreate userToDelete = new UserDtoCreate("userToDelete", new HashSet<>());
 
         mockMvc.perform(post("/users")
                 .header("Authorization", "Bearer " + adminToken)
@@ -168,13 +175,16 @@ public class UserControllerTest {
                 .content(objectMapper.writeValueAsString(userToDelete)))
                 .andExpect(status().isOk());
 
+        // Get the created user's ID
+        User createdUser = userRepository.findByName("userToDelete").orElseThrow();
+
         // Delete the user
-        mockMvc.perform(delete("/users/userToDelete")
+        mockMvc.perform(delete("/users/" + createdUser.getId())
                 .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk());
 
         // Verify the user is deleted
-        mockMvc.perform(get("/users/userToDelete")
+        mockMvc.perform(get("/users/" + createdUser.getId())
                 .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
     }

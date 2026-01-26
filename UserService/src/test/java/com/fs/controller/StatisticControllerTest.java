@@ -6,6 +6,7 @@ import com.fs.dto.LoginRequestDto;
 import com.fs.dto.SignupRequestDto;
 import com.fs.dto.UserDtoCreate;
 import com.fs.domain.Position;
+import com.fs.domain.User;
 import com.fs.repository.UserRepository;
 import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.AfterEach;
@@ -43,6 +44,7 @@ public class StatisticControllerTest {
     private String adminToken;
     private String userToken;
     private String testUserId = "statTestUser";
+    private Long testUserLongId;
 
     @BeforeEach
     public void setup() throws Exception {
@@ -65,7 +67,7 @@ public class StatisticControllerTest {
         portfolio.add(new Position("AAPL", 10));
         portfolio.add(new Position("MSFT", 5));
 
-        UserDtoCreate userCreate = new UserDtoCreate(testUserId, "Stat Test User", portfolio);
+        UserDtoCreate userCreate = new UserDtoCreate(testUserId, portfolio);
 
         mockMvc.perform(post("/users")
                 .header("Authorization", "Bearer " + adminToken)
@@ -73,8 +75,12 @@ public class StatisticControllerTest {
                 .content(objectMapper.writeValueAsString(userCreate)))
                 .andExpect(status().isOk());
 
+        // Get the created user's ID
+        User createdUser = userRepository.findByName(testUserId).orElseThrow();
+        testUserLongId = createdUser.getId();
+
         // Register the user with a password
-        SignupRequestDto signupRequest = new SignupRequestDto(testUserId, "Stat Test User", "password123");
+        SignupRequestDto signupRequest = new SignupRequestDto(testUserId, testUserId, "password123");
 
         mockMvc.perform(post("/api/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -98,12 +104,14 @@ public class StatisticControllerTest {
 
     @AfterEach
     public void cleanup() {
-        userRepository.deleteById(testUserId);
+        if (testUserLongId != null) {
+            userRepository.deleteById(testUserLongId);
+        }
     }
 
     @Test
     public void testGetClassStat_AsAdmin() throws Exception {
-        mockMvc.perform(get("/statistic/classes/" + testUserId)
+        mockMvc.perform(get("/statistic/classes/" + testUserLongId)
                 .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.classes").isArray());
@@ -111,7 +119,7 @@ public class StatisticControllerTest {
 
     @Test
     public void testGetClassStat_AsUser() throws Exception {
-        mockMvc.perform(get("/statistic/classes/" + testUserId)
+        mockMvc.perform(get("/statistic/classes/" + testUserLongId)
                 .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.classes").isArray());
@@ -119,7 +127,7 @@ public class StatisticControllerTest {
 
     @Test
     public void testGetClassStat_Unauthorized() throws Exception {
-        mockMvc.perform(get("/statistic/classes/" + testUserId))
+        mockMvc.perform(get("/statistic/classes/" + testUserLongId))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -127,7 +135,7 @@ public class StatisticControllerTest {
     public void testGetClassStat_Forbidden() throws Exception {
         // Create another user
         String anotherUserId = "anotherStatUser";
-        UserDtoCreate anotherUserCreate = new UserDtoCreate(anotherUserId, "Another Stat User", new HashSet<>());
+        UserDtoCreate anotherUserCreate = new UserDtoCreate(anotherUserId, new HashSet<>());
 
         mockMvc.perform(post("/users")
                 .header("Authorization", "Bearer " + adminToken)
@@ -135,18 +143,21 @@ public class StatisticControllerTest {
                 .content(objectMapper.writeValueAsString(anotherUserCreate)))
                 .andExpect(status().isOk());
 
+        // Get the created user's ID
+        User anotherUser = userRepository.findByName(anotherUserId).orElseThrow();
+
         // Try to access another user's statistics as a regular user
-        mockMvc.perform(get("/statistic/classes/" + anotherUserId)
+        mockMvc.perform(get("/statistic/classes/" + anotherUser.getId())
                 .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isForbidden());
 
         // Clean up
-        userRepository.deleteById(anotherUserId);
+        userRepository.deleteById(anotherUser.getId());
     }
 
     @Test
     public void testGetCostPortfolio_AsAdmin() throws Exception {
-        mockMvc.perform(get("/statistic/cost/" + testUserId)
+        mockMvc.perform(get("/statistic/cost/" + testUserLongId)
                 .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cost").isNumber());
@@ -154,7 +165,7 @@ public class StatisticControllerTest {
 
     @Test
     public void testGetCostPortfolio_AsUser() throws Exception {
-        mockMvc.perform(get("/statistic/cost/" + testUserId)
+        mockMvc.perform(get("/statistic/cost/" + testUserLongId)
                 .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cost").isNumber());
@@ -162,13 +173,13 @@ public class StatisticControllerTest {
 
     @Test
     public void testGetCostPortfolio_Unauthorized() throws Exception {
-        mockMvc.perform(get("/statistic/cost/" + testUserId))
+        mockMvc.perform(get("/statistic/cost/" + testUserLongId))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     public void testGetClassStatByType_AsAdmin() throws Exception {
-        mockMvc.perform(get("/statistic/classes/" + testUserId + "/STOCK")
+        mockMvc.perform(get("/statistic/classes/" + testUserLongId + "/STOCK")
                 .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.value").isNumber());
@@ -176,7 +187,7 @@ public class StatisticControllerTest {
 
     @Test
     public void testGetClassStatByType_AsUser() throws Exception {
-        mockMvc.perform(get("/statistic/classes/" + testUserId + "/STOCK")
+        mockMvc.perform(get("/statistic/classes/" + testUserLongId + "/STOCK")
                 .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.value").isNumber());
@@ -184,7 +195,7 @@ public class StatisticControllerTest {
 
     @Test
     public void testGetClassStatByType_Unauthorized() throws Exception {
-        mockMvc.perform(get("/statistic/classes/" + testUserId + "/STOCK"))
+        mockMvc.perform(get("/statistic/classes/" + testUserLongId + "/STOCK"))
                 .andExpect(status().isUnauthorized());
     }
 }

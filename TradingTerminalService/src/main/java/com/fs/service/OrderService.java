@@ -1,0 +1,295 @@
+package com.fs.service;
+
+import com.fs.domain.Order;
+import com.fs.domain.OrderStatus;
+import com.fs.domain.OrderType;
+import com.fs.dto.BrokerOrderDto;
+import com.fs.dto.CreateBrokerOrderDto;
+import com.fs.dto.CreateOrderDto;
+import com.fs.dto.OrderDto;
+import com.fs.dto.OrderStatsDto;
+import com.fs.feignclient.BrokerIntegrationServiceClient;
+import com.fs.repository.OrderRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class OrderService {
+
+    private final OrderRepository orderRepository;
+    private final BrokerIntegrationServiceClient brokerIntegrationServiceClient;
+    
+    @Value("${broker.default-account-id:}")
+    private String defaultAccountId;
+    
+    @Value("${broker.integration.enabled:true}")
+    private boolean brokerIntegrationEnabled;
+
+    @Transactional
+    public OrderDto createOrder(String userId, CreateOrderDto createOrderDto) {
+        log.info("Создание ордера для пользователя: {}, FIGI: {}, тип: {}", userId, createOrderDto.getFigi(), createOrderDto.getType());
+        
+        Long userIdLong = parseUserId(userId);
+        
+        Order order = new Order();
+        order.setUserId(userIdLong);
+        order.setFigi(createOrderDto.getFigi());
+        order.setType(createOrderDto.getType());
+        order.setQuantity(createOrderDto.getQuantity());
+        order.setPrice(createOrderDto.getPrice());
+        order.setStatus(OrderStatus.PENDING);
+        order.setCreatedAt(LocalDateTime.now());
+        order.setComment(createOrderDto.getComment());
+
+        Order savedOrder = orderRepository.save(order);
+        log.info("Ордер создан с ID: {}", savedOrder.getId());
+        
+        // Если включена интеграция с брокером, отправляем заявку на биржу
+        if (brokerIntegrationEnabled) {
+            try {
+                String accountId = getAccountIdForUser(userId);
+                log.debug("Отправка заявки на биржу для accountId: {}, FIGI: {}", accountId, createOrderDto.getFigi());
+                BrokerOrderDto brokerOrder = sendOrderToBroker(accountId, createOrderDto);
+                
+                // Обновляем статус заявки на основе ответа брокера
+                if (brokerOrder != null && brokerOrder.getOrderId() != null) {
+                    // Сохраняем ID заявки на бирже в комментарии (можно добавить отдельное поле)
+                    String brokerOrderId = brokerOrder.getOrderId();
+                    savedOrder.setComment(
+                        (savedOrder.getComment() != null ? savedOrder.getComment() + " | " : "") +
+                        "Broker Order ID: " + brokerOrderId
+                    );
+                    orderRepository.save(savedOrder);
+                    log.info("Заявка отправлена на биржу. Broker Order ID: {}", brokerOrderId);
+                } else {
+                    log.warn("Брокерский сервис вернул пустой ответ или orderId отсутствует");
+                }
+            } catch (Exception e) {
+                log.error("Ошибка при отправке заявки на биржу: {}", e.getMessage(), e);
+                // Не прерываем создание заявки в системе, но логируем ошибку
+                // Можно добавить статус "PENDING_BROKER_ERROR" для таких случаев
+            }
+        }
+        
+        return convertToDto(savedOrder);
+    }
+    
+    /**
+     * Отправить заявку на биржу через брокера
+     */
+    private BrokerOrderDto sendOrderToBroker(String accountId, CreateOrderDto createOrderDto) {
+        try {
+            CreateBrokerOrderDto brokerOrderDto = new CreateBrokerOrderDto();
+            brokerOrderDto.setFigi(createOrderDto.getFigi());
+            // Преобразуем BigDecimal в Long (количество лотов)
+            // Округляем до ближайшего целого числа
+            brokerOrderDto.setQuantity(createOrderDto.getQuantity().longValue());
+            brokerOrderDto.setPrice(createOrderDto.getPrice());
+            brokerOrderDto.setDirection(createOrderDto.getType().name());
+            brokerOrderDto.setOrderType("LIMIT"); // По умолчанию лимитная заявка
+            brokerOrderDto.setComment(createOrderDto.getComment());
+            
+            log.debug("Вызов brokerIntegrationServiceClient.placeOrder с accountId: {}, FIGI: {}, quantity: {}, price: {}", 
+                    accountId, brokerOrderDto.getFigi(), brokerOrderDto.getQuantity(), brokerOrderDto.getPrice());
+            
+            return brokerIntegrationServiceClient.placeOrder(accountId, brokerOrderDto, null);
+        } catch (Exception e) {
+            log.error("Исключение при вызове brokerIntegrationServiceClient.placeOrder: {}", e.getMessage(), e);
+            throw e; // Пробрасываем исключение дальше для обработки в createOrder
+        }
+    }
+    
+    /**
+     * Получить accountId для пользователя
+     * В реальной системе это должно быть из базы данных или конфигурации
+     */
+    private String getAccountIdForUser(String userId) {
+        // TODO: Реализовать получение accountId из базы данных или конфигурации
+        // Пока используем дефолтный или userId как accountId
+        if (defaultAccountId != null && !defaultAccountId.isEmpty()) {
+            log.debug("Используется дефолтный accountId: {}", defaultAccountId);
+            return defaultAccountId;
+        }
+        log.debug("Используется userId как accountId: {}", userId);
+        return userId; // Временное решение
+    }
+
+    public List<OrderDto> getUserOrders(String userId) {
+        log.info("Получение ордеров для пользователя: {}", userId);
+        Long userIdLong = parseUserId(userId);
+        return orderRepository.findByUserId(userIdLong).stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
+    public List<OrderDto> getUserOrdersByStatus(String userId, OrderStatus status) {
+        log.info("Получение ордеров для пользователя: {} со статусом: {}", userId, status);
+        Long userIdLong = parseUserId(userId);
+        return orderRepository.findByUserIdAndStatus(userIdLong, status).stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public OrderDto executeOrder(String orderId) {
+        log.info("Исполнение ордера: {}", orderId);
+        Long orderIdLong = parseOrderId(orderId);
+        Order order = orderRepository.findById(orderIdLong)
+                .orElseThrow(() -> new IllegalArgumentException("Ордер не найден: " + orderId));
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new IllegalStateException("Ордер уже обработан. Текущий статус: " + order.getStatus());
+        }
+
+        // Если включена интеграция с брокером, проверяем статус заявки на бирже
+        if (brokerIntegrationEnabled) {
+            try {
+                String brokerOrderId = extractBrokerOrderId(order.getComment());
+                if (brokerOrderId != null) {
+                    String accountId = getAccountIdForUser(String.valueOf(order.getUserId()));
+                    BrokerOrderDto brokerOrder = brokerIntegrationServiceClient.getOrderStatus(accountId, brokerOrderId, null);
+                    
+                    // Обновляем статус на основе статуса заявки на бирже
+                    if (brokerOrder != null && "FILL".equals(brokerOrder.getStatus())) {
+                        order.setStatus(OrderStatus.EXECUTED);
+                        order.setExecutedAt(LocalDateTime.now());
+                        log.info("Заявка на бирже исполнена. Broker Order ID: {}", brokerOrderId);
+                    } else {
+                        log.warn("Заявка на бирже еще не исполнена. Статус: {}", brokerOrder != null ? brokerOrder.getStatus() : "unknown");
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Ошибка при проверке статуса заявки на бирже: {}", e.getMessage(), e);
+                // Продолжаем выполнение, устанавливая статус вручную
+                order.setStatus(OrderStatus.EXECUTED);
+                order.setExecutedAt(LocalDateTime.now());
+            }
+        } else {
+            order.setStatus(OrderStatus.EXECUTED);
+            order.setExecutedAt(LocalDateTime.now());
+        }
+        
+        Order savedOrder = orderRepository.save(order);
+        log.info("Ордер исполнен: {}", orderId);
+        
+        return convertToDto(savedOrder);
+    }
+    
+    /**
+     * Извлечь ID заявки на бирже из комментария
+     */
+    private String extractBrokerOrderId(String comment) {
+        if (comment == null || comment.isEmpty()) {
+            return null;
+        }
+        String prefix = "Broker Order ID: ";
+        int index = comment.indexOf(prefix);
+        if (index != -1) {
+            String brokerOrderId = comment.substring(index + prefix.length()).trim();
+            // Убираем все после пробела или новой строки
+            int spaceIndex = brokerOrderId.indexOf(' ');
+            if (spaceIndex != -1) {
+                brokerOrderId = brokerOrderId.substring(0, spaceIndex);
+            }
+            return brokerOrderId;
+        }
+        return null;
+    }
+
+    @Transactional
+    public OrderDto cancelOrder(String orderId) {
+        log.info("Отмена ордера: {}", orderId);
+        Long orderIdLong = parseOrderId(orderId);
+        Order order = orderRepository.findById(orderIdLong)
+                .orElseThrow(() -> new IllegalArgumentException("Ордер не найден: " + orderId));
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new IllegalStateException("Невозможно отменить ордер. Текущий статус: " + order.getStatus());
+        }
+
+        // Если включена интеграция с брокером, отменяем заявку на бирже
+        if (brokerIntegrationEnabled) {
+            try {
+                String brokerOrderId = extractBrokerOrderId(order.getComment());
+                if (brokerOrderId != null) {
+                    String accountId = getAccountIdForUser(String.valueOf(order.getUserId()));
+                    brokerIntegrationServiceClient.cancelOrder(accountId, brokerOrderId, null);
+                    log.info("Заявка отменена на бирже. Broker Order ID: {}", brokerOrderId);
+                }
+            } catch (Exception e) {
+                log.error("Ошибка при отмене заявки на бирже: {}", e.getMessage(), e);
+                // Продолжаем отмену в системе даже если не удалось отменить на бирже
+            }
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
+        
+        Order savedOrder = orderRepository.save(order);
+        log.info("Ордер отменен: {}", orderId);
+        
+        return convertToDto(savedOrder);
+    }
+
+    public OrderDto getOrder(String orderId) {
+        Long orderIdLong = parseOrderId(orderId);
+        Order order = orderRepository.findById(orderIdLong)
+                .orElseThrow(() -> new IllegalArgumentException("Ордер не найден: " + orderId));
+        return convertToDto(order);
+    }
+    
+    private Long parseUserId(String userId) {
+        try {
+            return Long.parseLong(userId);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Неверный формат userId: " + userId);
+        }
+    }
+    
+    private Long parseOrderId(String orderId) {
+        try {
+            return Long.parseLong(orderId);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Неверный формат orderId: " + orderId);
+        }
+    }
+
+    public OrderStatsDto getOrderStats() {
+        List<Order> allOrders = orderRepository.findAll();
+        Long totalOrders = (long) allOrders.size();
+        
+        Map<String, Long> ordersByStatus = allOrders.stream()
+                .collect(Collectors.groupingBy(
+                        order -> order.getStatus().name(),
+                        Collectors.counting()
+                ));
+        
+        return new OrderStatsDto(totalOrders, ordersByStatus);
+    }
+
+    private OrderDto convertToDto(Order order) {
+        return new OrderDto(
+                String.valueOf(order.getId()),
+                String.valueOf(order.getUserId()),
+                order.getFigi(),
+                order.getType(),
+                order.getQuantity(),
+                order.getPrice(),
+                order.getStatus(),
+                order.getCreatedAt(),
+                order.getExecutedAt(),
+                order.getComment()
+        );
+    }
+}
