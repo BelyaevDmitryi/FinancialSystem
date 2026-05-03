@@ -94,6 +94,22 @@ spring:
           filters:
             - StripPrefix=1
 
+        # Market History Service (исторические свечи)
+        - id: market-history-service
+          uri: lb://market-history-service
+          predicates:
+            - Path=/api/market-history/**
+          filters:
+            - StripPrefix=1
+
+        # Bot Optimization Service
+        - id: bot-optimization-service
+          uri: lb://bot-optimization-service
+          predicates:
+            - Path=/api/bot-optimization/**
+          filters:
+            - StripPrefix=1
+
         # Admin Panel Service routes
         - id: admin-panel-service
           uri: lb://admin-panel-service
@@ -155,6 +171,7 @@ logging:
     root: INFO
     org.springframework.cloud.gateway: DEBUG
 
+# В продакшене обязательно задайте JWT_SECRET (тот же, что в UserService)
 jwt:
-  secret: 5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437
+  secret: ${JWT_SECRET:5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437}
 

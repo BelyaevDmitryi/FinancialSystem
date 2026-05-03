@@ -1,0 +1,52 @@
+@startuml c4-component-trading-bot-service
+' C4 Level 3 — только логические компоненты внутри одного контейнера TradingBotService (без Level 4 / классов).
+' Соответствие коду: com.fs.controller, com.fs.service, com.fs.repository, com.fs.feignclient, com.fs.security, com.fs.exception.
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_LEFT_RIGHT()
+
+title C4 — компоненты: Trading Bot Service (критический контур робота)
+
+Container_Boundary(bot_boundary, "Trading Bot Service") {
+    Component(ctrl, "TradingBotController", "Spring Web MVC", "REST: создание ботов, список, смена статуса; заголовок X-User-Id.")
+    Component(svc, "TradingBotService", "Spring @Service", "CRUD ботов, @Scheduled тик стратегий, координация вызовов.")
+    Component(exec, "BotStrategyExecutor", "Spring компонент", "MACD_CROSSOVER, SMA_CROSSOVER, VOLATILITY_BREAKOUT, EMA_TREND.")
+    Component(repo, "TradingBotRepository", "Spring Data JPA", "Персистенция сущности TradingBot.")
+    Component(feign_an, "AnalyticsServiceClient", "OpenFeign", "Индикаторы для решений робота.")
+    Component(feign_pr, "PriceServiceClient", "OpenFeign", "Текущие цены по FIGI.")
+    Component(feign_tt, "TradingTerminalServiceClient", "OpenFeign", "Создание ордеров в торговом терминале.")
+    Component(sec, "JwtAuthenticationFilter / JwtUtils", "Spring Security", "Проверка JWT для защищённых эндпоинтов.")
+    Component(err, "ExceptionController", "@ControllerAdvice", "Единый формат ошибок API.")
+}
+
+Container_Ext(gateway, "API Gateway", "Spring Cloud Gateway", "Маршрут /api/bots/** → lb://trading-bot-service")
+Container_Ext(analytics, "Analytics Service", "Spring Boot", "Расчёт SMA, EMA, MACD, волатильности.")
+Container_Ext(price, "Price Service", "Spring Boot", "Котировки и кеш.")
+Container_Ext(terminal, "Trading Terminal Service", "Spring Boot", "Исполнение заявок.")
+ContainerDb(bot_db, "БД ботов", "PostgreSQL", "Таблицы TradingBot и связанное.")
+
+Rel(gateway, ctrl, "HTTP JSON", "HTTPS / внутр. сеть")
+Rel(ctrl, sec, "Фильтрация запросов", "")
+Rel(ctrl, svc, "Делегирование", "")
+Rel(ctrl, err, "Исключения", "")
+
+Rel(svc, repo, "save / find", "")
+Rel(svc, exec, "Расчёт сигнала", "")
+Rel(svc, feign_an, "POST аналитики", "Feign")
+Rel(svc, feign_pr, "GET цен", "Feign")
+Rel(svc, feign_tt, "POST ордеров", "Feign")
+
+Rel(feign_an, analytics, "HTTP", "Eureka lb://")
+Rel(feign_pr, price, "HTTP", "Eureka lb://")
+Rel(feign_tt, terminal, "HTTP", "Eureka lb://")
+
+Rel(repo, bot_db, "JPA / JDBC", "SQL")
+
+note right of exec
+  **Модульность:** логика стратегий сейчас в сервисе; по дорожной карте — вынос общего домена и SPI в **fs-trading-core** (фаза B в OS_ENGINE_TRANSFORMATION_ALGORITHM.md), чтобы live и будущий бэктест не дублировали типы.
+end note
+
+SHOW_LEGEND()
+
+@enduml

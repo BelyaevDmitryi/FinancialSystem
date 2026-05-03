@@ -27,7 +27,9 @@ public class AdminController {
 
     @GetMapping("/stats")
     @Operation(summary = "Получить статистику системы")
-    public ResponseEntity<?> getSystemStats(@RequestHeader(value = "X-User-Roles", required = false) String rolesHeader) {
+    public ResponseEntity<?> getSystemStats(
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Roles", required = false) String rolesHeader) {
         // Проверяем наличие ролей ADMIN или OWNER
         if (rolesHeader == null || rolesHeader.isEmpty()) {
             log.warn("Попытка доступа к админ панели без ролей");
@@ -44,7 +46,7 @@ public class AdminController {
         }
 
         log.info("Запрос статистики системы");
-        SystemStatsDto stats = adminService.getSystemStats();
+        SystemStatsDto stats = adminService.getSystemStats(userId, rolesHeader);
         return ResponseEntity.ok(stats);
     }
 }

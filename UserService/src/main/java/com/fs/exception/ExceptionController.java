@@ -42,7 +42,7 @@ public class ExceptionController extends ResponseEntityExceptionHandler {
         return new ResponseEntity<>(new ErrorDto(ex.getLocalizedMessage()), HttpStatus.BAD_REQUEST);
     }
 
-    @ExceptionHandler({UserNotFoundException.class, StockNotFoundException.class})
+    @ExceptionHandler({UserNotFoundException.class, StockNotFoundException.class, BrokerAccountNotFoundException.class})
     public ResponseEntity<ErrorDto> handleNotFound(Exception ex) {
         logger.warn("Resource not found: {}", ex.getMessage());
         return new ResponseEntity<>(new ErrorDto(ex.getLocalizedMessage()), HttpStatus.NOT_FOUND);
@@ -52,6 +52,12 @@ public class ExceptionController extends ResponseEntityExceptionHandler {
     public ResponseEntity<ErrorDto> handleExceptionFromPriceService(Exception ex) {
         logger.error("Price service error: {}", ex.getMessage(), ex);
         return new ResponseEntity<>(new ErrorDto(ex.getLocalizedMessage()), HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ResponseEntity<ErrorDto> handleInvalidRefreshToken(InvalidRefreshTokenException ex) {
+        logger.warn("Invalid refresh token: {}", ex.getMessage());
+        return new ResponseEntity<>(new ErrorDto(ex.getMessage()), HttpStatus.UNAUTHORIZED);
     }
 
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})

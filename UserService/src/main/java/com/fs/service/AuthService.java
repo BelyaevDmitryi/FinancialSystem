@@ -38,6 +38,9 @@ public class AuthService {
     @Autowired
     private JwtUtils jwtUtils;
 
+    @Autowired
+    private UserDetailsServiceImpl userDetailsService;
+
     @Transactional
     public void registerUser(SignupRequestDto signupRequest) {
         logger.debug("Attempting to register user with username: {}", signupRequest.getUsername());
@@ -100,6 +103,9 @@ public class AuthService {
         }
     }
 
+    /**
+     * Аутентификация пользователя. Возвращает access-токен.
+     */
     public String authenticateUser(LoginRequestDto loginRequest) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
@@ -107,6 +113,32 @@ public class AuthService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         UserDetailsServiceImpl.UserPrincipal userPrincipal = (UserDetailsServiceImpl.UserPrincipal) authentication.getPrincipal();
         return jwtUtils.generateToken(userPrincipal);
+    }
+
+    /**
+     * Генерация refresh-токена для пользователя (после успешного логина).
+     */
+    public String generateRefreshToken(org.springframework.security.core.userdetails.UserDetails userDetails) {
+        return jwtUtils.generateRefreshToken(userDetails);
+    }
+
+    /**
+     * Обмен refresh-токена на новую пару access + refresh. Для продакшена: продление сессии без повторного ввода пароля.
+     */
+    public com.fs.dto.JwtResponseDto refreshTokens(String refreshToken) {
+        if (refreshToken == null || !jwtUtils.validateRefreshToken(refreshToken)) {
+            throw new com.fs.exception.InvalidRefreshTokenException("Невалидный или истёкший refresh token");
+        }
+        String userId = jwtUtils.extractUserId(refreshToken);
+        UserDetailsServiceImpl.UserPrincipal userPrincipal = (UserDetailsServiceImpl.UserPrincipal)
+                userDetailsService.loadUserById(Long.parseLong(userId));
+        String newAccess = jwtUtils.generateToken(userPrincipal);
+        String newRefresh = jwtUtils.generateRefreshToken(userPrincipal);
+        return com.fs.dto.JwtResponseDto.tokensOnly(newAccess, newRefresh, jwtUtils.getExpirationMs());
+    }
+
+    public long getAccessTokenExpirationMs() {
+        return jwtUtils.getExpirationMs();
     }
 }
 

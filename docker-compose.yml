@@ -43,6 +43,10 @@ services:
         condition: service_started
       trading-bot-service:
         condition: service_started
+      market-history-service:
+        condition: service_started
+      bot-optimization-service:
+        condition: service_started
       admin-panel-service:
         condition: service_started
       dashboard-service:
@@ -88,7 +92,7 @@ services:
 
   postgres:
     image: postgres:15-alpine
-    container_name: postgres
+    container_name: financial-system-postgres
     restart: always
     ports:
       - "5432:5432"
@@ -250,6 +254,52 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8007/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  market-history-service:
+    build:
+      context: ./MarketHistoryService
+      dockerfile: Dockerfile
+    container_name: market-history-service
+    ports:
+      - "8010:8010"
+    environment:
+      SERVER_PORT: 8010
+      JWT_SECRET: ${JWT_SECRET:-5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437}
+    networks:
+      - financial-network
+    depends_on:
+      eureka-server:
+        condition: service_started
+      broker-integration-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  bot-optimization-service:
+    build:
+      context: ./BotOptimizationService
+      dockerfile: Dockerfile
+    container_name: bot-optimization-service
+    ports:
+      - "8011:8011"
+    environment:
+      SERVER_PORT: 8011
+      JWT_SECRET: ${JWT_SECRET:-5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437}
+    networks:
+      - financial-network
+    depends_on:
+      eureka-server:
+        condition: service_started
+      market-history-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8011/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3

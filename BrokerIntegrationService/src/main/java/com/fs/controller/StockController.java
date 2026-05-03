@@ -3,6 +3,7 @@ package com.fs.controller;
 import com.fs.dto.BrokerOrderDto;
 import com.fs.dto.CreateBrokerOrderDto;
 import com.fs.dto.FigiesDto;
+import com.fs.dto.HistoricCandlesDto;
 import com.fs.dto.OrderBookDto;
 import com.fs.dto.StocksDto;
 import com.fs.dto.StocksPricesDto;
@@ -19,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.List;
 
 @RestController
@@ -69,6 +71,22 @@ public class StockController {
             stocks = brokerIntegrationService.getAvailableTickers();
         }
         return ResponseEntity.ok(stocks);
+    }
+
+    @GetMapping("/history/candles")
+    @Operation(summary = "Исторические свечи по FIGI (UTC)")
+    public HistoricCandlesDto getHistoricCandles(
+            @RequestParam String figi,
+            @RequestParam Instant from,
+            @RequestParam Instant to,
+            @Parameter(description = "DAY, HOUR, MIN_15, MIN_5, MIN_1")
+            @RequestParam(required = false, defaultValue = "DAY") String interval,
+            @RequestParam(required = false) String broker) {
+        log.info("Historic candles figi={} from={} to={} interval={}", figi, from, to, interval);
+        if (broker != null) {
+            return brokerIntegrationService.getHistoricCandles(figi, from, to, interval, broker);
+        }
+        return brokerIntegrationService.getHistoricCandles(figi, from, to, interval);
     }
 
     @PostMapping("/prices")

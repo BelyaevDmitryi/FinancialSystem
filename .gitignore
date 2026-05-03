@@ -11,3 +11,5 @@
 /UserService/logs/
 /TinkoffStockService/logs/
 .env
+/.cursor/
+/.vscode/

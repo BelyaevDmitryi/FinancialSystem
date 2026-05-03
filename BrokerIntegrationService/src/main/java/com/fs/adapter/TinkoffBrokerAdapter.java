@@ -1,5 +1,6 @@
 package com.fs.adapter;
 
+import com.fs.dto.BrokerCandleDto;
 import com.fs.dto.BrokerOrderDto;
 import com.fs.dto.CreateBrokerOrderDto;
 import com.fs.dto.FigiesDto;
@@ -16,7 +17,9 @@ import com.fs.model.Stock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import ru.tinkoff.piapi.contract.v1.CandleInterval;
 import ru.tinkoff.piapi.contract.v1.GetOrderBookResponse;
+import ru.tinkoff.piapi.contract.v1.HistoricCandle;
 import ru.tinkoff.piapi.contract.v1.InstrumentShort;
 import ru.tinkoff.piapi.contract.v1.OrderDirection;
 import ru.tinkoff.piapi.contract.v1.OrderType;
@@ -286,7 +289,7 @@ public class TinkoffBrokerAdapter implements BrokerAdapter {
                 .thenApply(instruments -> instruments.stream()
                         .filter(instrument -> instrument.getApiTradeAvailableFlag()
                                 && instrument.getInstrumentKindValue() == INSTRUMENT_KIND_SHARE
-                                && ticker.equals(instrument.getTicker()))
+                                && ticker.equalsIgnoreCase(instrument.getTicker()))
                         .collect(Collectors.toList()));
     }
     
@@ -457,6 +460,49 @@ public class TinkoffBrokerAdapter implements BrokerAdapter {
             log.error("Error getting active orders from Tinkoff: {}", e.getMessage(), e);
             throw new RuntimeException("Не удалось получить список активных заявок: " + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public List<BrokerCandleDto> getHistoricCandles(String figi, Instant from, Instant to, String interval) {
+        CandleInterval candleInterval = resolveCandleInterval(interval);
+        try {
+            List<HistoricCandle> list = investApi.getMarketDataService()
+                    .getCandlesSync(figi, from, to, candleInterval);
+            if (list == null || list.isEmpty()) {
+                return Collections.emptyList();
+            }
+            List<BrokerCandleDto> out = new ArrayList<>(list.size());
+            for (HistoricCandle c : list) {
+                var ts = c.getTime();
+                Instant t = Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos());
+                out.add(new BrokerCandleDto(
+                        t,
+                        MapperUtils.quotationToBigDecimal(c.getOpen()),
+                        MapperUtils.quotationToBigDecimal(c.getHigh()),
+                        MapperUtils.quotationToBigDecimal(c.getLow()),
+                        MapperUtils.quotationToBigDecimal(c.getClose()),
+                        c.getVolume()
+                ));
+            }
+            return out;
+        } catch (Exception e) {
+            log.error("Error loading historic candles for {}: {}", figi, e.getMessage(), e);
+            throw new RuntimeException("Не удалось загрузить исторические свечи: " + e.getMessage(), e);
+        }
+    }
+
+    private CandleInterval resolveCandleInterval(String interval) {
+        if (interval == null || interval.isBlank()) {
+            return CandleInterval.CANDLE_INTERVAL_DAY;
+        }
+        return switch (interval.trim().toUpperCase()) {
+            case "MIN_1", "CANDLE_INTERVAL_1_MIN", "1M" -> CandleInterval.CANDLE_INTERVAL_1_MIN;
+            case "MIN_5", "CANDLE_INTERVAL_5_MIN", "5M" -> CandleInterval.CANDLE_INTERVAL_5_MIN;
+            case "MIN_15", "CANDLE_INTERVAL_15_MIN", "15M" -> CandleInterval.CANDLE_INTERVAL_15_MIN;
+            case "HOUR", "CANDLE_INTERVAL_HOUR", "1H" -> CandleInterval.CANDLE_INTERVAL_HOUR;
+            case "DAY", "CANDLE_INTERVAL_DAY", "1D", "D" -> CandleInterval.CANDLE_INTERVAL_DAY;
+            default -> throw new IllegalArgumentException("Неподдерживаемый интервал свечей: " + interval);
+        };
     }
     
     /**

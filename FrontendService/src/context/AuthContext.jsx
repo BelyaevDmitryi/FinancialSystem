@@ -38,14 +38,14 @@ export const AuthProvider = ({ children }) => {
         username,
         password,
       })
-      const { token: newToken, id, name, roles } = response.data
+      const { token: newToken, refreshToken: newRefreshToken, id, name, roles } = response.data
       const userData = { id, name, username, roles: roles || [] }
       
       setToken(newToken)
       setUser(userData)
       localStorage.setItem('token', newToken)
+      if (newRefreshToken) localStorage.setItem('refreshToken', newRefreshToken)
       localStorage.setItem('user', JSON.stringify(userData))
-      // Authorization header добавляется автоматически через interceptor в api.js
       
       return { success: true }
     } catch (error) {
@@ -102,8 +102,8 @@ export const AuthProvider = ({ children }) => {
     setToken(null)
     setUser(null)
     localStorage.removeItem('token')
+    localStorage.removeItem('refreshToken')
     localStorage.removeItem('user')
-    // Authorization header автоматически не будет добавляться, так как токен удален из localStorage
   }
 
   return (

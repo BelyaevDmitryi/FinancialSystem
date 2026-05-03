@@ -117,11 +117,25 @@
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+            <exclusions>
+                <!-- Исключаем spring-cloud-commons в тестах: HostInfoEnvironmentPostProcessor вызывает
+                     InetAddress.getLocalHost(), что падает с SocketException в sandbox/CI без сети -->
+                <exclusion>
+                    <groupId>org.springframework.cloud</groupId>
+                    <artifactId>spring-cloud-commons</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <!-- OpenFeign -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.cloud</groupId>
+                    <artifactId>spring-cloud-commons</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <!-- Spring Security -->
         <dependency>

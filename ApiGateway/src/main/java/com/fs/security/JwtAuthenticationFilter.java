@@ -27,6 +27,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final String[] PUBLIC_PATHS = {
             "/api/auth/signin",
             "/api/auth/signup",
+            "/api/auth/refresh",
             "/api-docs",
             "/swagger-ui",
             "/actuator"

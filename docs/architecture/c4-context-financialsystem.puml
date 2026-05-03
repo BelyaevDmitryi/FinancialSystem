@@ -1,0 +1,31 @@
+@startuml c4-context-financialsystem
+' Правило 033: C4 только уровни 1–3; без Level 4 (Code).
+' Модульность: один bounded context на сервис; межсервис — HTTP/JSON (Feign); общие доменные типы — в планируемой библиотеке fs-trading-core (см. docs/OS_ENGINE_TRANSFORMATION_ALGORITHM.md); BacktestService / Optimizer — будущие Maven-модули (фазы C–D), не текущие артефакты pom.xml.
+' Контраст с OsEngine: там десктопный монолитный комплект; здесь — распределённые контейнеры и единая точка входа через API Gateway.
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+
+title C4 — контекст системы: FinancialSystem (микросервисы)
+
+Person(trader, "Пользователь / трейдер", "Клиент: браузер, мобильное приложение или API-клиент (Postman и т.п.).")
+Person(admin, "Администратор", "Операции мониторинга и администрирования через защищённые API.")
+
+System(fs, "FinancialSystem", "Облачная платформа на Spring Boot: торговый терминал, роботы, аналитика, цены и интеграция с брокером. **Несколько независимых деплоев**, а не один исполняемый монолит.")
+
+System_Ext(broker_api, "API брокера (Т-Инвестиции и др.)", "Внешняя биржевая / брокерская система для котировок и заявок.")
+
+Rel(trader, fs, "HTTPS: запросы к REST через единый шлюз", "JSON + JWT")
+Rel(admin, fs, "HTTPS: админ- и дашборд-API", "JSON + JWT")
+Rel(fs, broker_api, "Интеграция через сервис-адаптер", "HTTPS / gRPC (зависит от брокера)")
+
+note right of fs
+  **Противопоставление OsEngine:** OsEngine — десктопный .NET-монолитный набор приложений на одной машине.
+  FinancialSystem — **модульный монорепозиторий Maven** с **отдельными Spring Boot-сервисами**, регистрацией в **Eureka** и маршрутизацией через **API Gateway** (см. контейнерную диаграмму).
+  План: общий домен в **fs-trading-core**; сценарии **бэктест / оптимизатор** — отдельные сервисы по фазам C–D документа трансформации.
+end note
+
+SHOW_LEGEND()
+
+@enduml

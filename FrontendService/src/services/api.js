@@ -1,16 +1,10 @@
 import axios from 'axios'
 
-// В production (Docker) используем относительный путь, чтобы запросы шли через nginx proxy
-// В development используем относительный путь, чтобы запросы шли через Vite proxy
 const getBaseURL = () => {
-  // Если указана переменная окружения, используем её
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL
   }
-  
-  // В production и development используем относительный путь
-  // nginx (в production) или Vite proxy (в development) будут проксировать запросы к api-gateway
-  return '' // Относительный путь - запросы пойдут через proxy
+  return ''
 }
 
 const api = axios.create({
@@ -20,8 +14,7 @@ const api = axios.create({
   },
 })
 
-// Interceptor для добавления JWT токена в Authorization header
-// X-User-Id добавляется автоматически ApiGateway после валидации JWT
+// Добавляем access token в запросы. X-User-Id проставляет ApiGateway после валидации JWT.
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token')
@@ -30,41 +23,74 @@ api.interceptors.request.use(
     }
     return config
   },
-  (error) => {
+  (error) => Promise.reject(error)
+)
+
+// При 401 пробуем обновить сессию через refresh token; при неудаче — выход и редирект на логин.
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config
+
+    if (error.response?.status !== 401) {
+      logError(error)
+      return Promise.reject(error)
+    }
+
+    // Уже повторяли запрос после refresh — выходим
+    if (originalRequest._retriedAfterRefresh) {
+      clearAuthAndRedirect()
+      return Promise.reject(error)
+    }
+
+    const refreshToken = localStorage.getItem('refreshToken')
+    if (!refreshToken) {
+      clearAuthAndRedirect()
+      return Promise.reject(error)
+    }
+
+    try {
+      const baseURL = getBaseURL()
+      const { data } = await axios.post(
+        `${baseURL}/api/auth/refresh`,
+        { refreshToken },
+        { headers: { 'Content-Type': 'application/json' } }
+      )
+      const newToken = data.token ?? data.accessToken
+      const newRefresh = data.refreshToken
+      if (newToken) {
+        localStorage.setItem('token', newToken)
+        if (newRefresh) localStorage.setItem('refreshToken', newRefresh)
+        originalRequest.headers['Authorization'] = `Bearer ${newToken}`
+        originalRequest._retriedAfterRefresh = true
+        return api(originalRequest)
+      }
+    } catch (refreshError) {
+      logError(refreshError)
+    }
+
+    clearAuthAndRedirect()
     return Promise.reject(error)
   }
 )
 
-// Interceptor для обработки ошибок
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    // Логирование ошибок для отладки
-    if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-      console.error('Network Error:', {
-        message: error.message,
-        code: error.code,
-        config: {
-          url: error.config?.url,
-          baseURL: error.config?.baseURL,
-          method: error.config?.method,
-        },
-      })
-    } else {
-      console.error('API Error:', {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-      })
-    }
-    
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
-    }
-    return Promise.reject(error)
+function clearAuthAndRedirect() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('refreshToken')
+  localStorage.removeItem('user')
+  window.location.href = '/login'
+}
+
+function logError(error) {
+  if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+    console.error('Network Error:', { message: error.message, code: error.code })
+  } else {
+    console.error('API Error:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+    })
   }
-)
+}
 
 export default api

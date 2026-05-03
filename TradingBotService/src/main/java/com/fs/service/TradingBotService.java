@@ -67,16 +67,33 @@ public class TradingBotService {
     }
 
     @Transactional
-    public BotDto updateBotStatus(String botId, BotStatus status) {
+    public BotDto updateBotStatus(String userId, String botId, BotStatus status) {
+        Long userIdLong = parseUserId(userId);
         Long botIdLong = parseBotId(botId);
         TradingBot bot = botRepository.findById(botIdLong)
                 .orElseThrow(() -> new IllegalArgumentException("Бот не найден: " + botId));
-        
+        if (!bot.getUserId().equals(userIdLong)) {
+            throw new IllegalArgumentException("Нет доступа к боту: " + botId);
+        }
+
         bot.setStatus(status);
         TradingBot savedBot = botRepository.save(bot);
         log.info("Статус бота {} изменен на {}", botId, status);
-        
+
         return convertToDto(savedBot);
+    }
+
+    @Transactional
+    public void deleteBot(String userId, String botId) {
+        Long userIdLong = parseUserId(userId);
+        Long botIdLong = parseBotId(botId);
+        TradingBot bot = botRepository.findById(botIdLong)
+                .orElseThrow(() -> new IllegalArgumentException("Бот не найден: " + botId));
+        if (!bot.getUserId().equals(userIdLong)) {
+            throw new IllegalArgumentException("Нет доступа к боту: " + botId);
+        }
+        botRepository.delete(bot);
+        log.info("Бот {} удалён пользователем {}", botId, userIdLong);
     }
 
     @Scheduled(fixedDelayString = "${bot.scheduler.fixed-delay}")

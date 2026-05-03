@@ -79,12 +79,21 @@ const BotsPage = () => {
 
       setError('') // Очищаем предыдущие ошибки
       
-      // Получаем figi по ticker
-      const stockResponse = await api.get(`/api/stocks/${formData.ticker.trim().toUpperCase()}`)
-      const figi = stockResponse.data?.figi
-      
+      // FIGI: сначала справочник UserService, при пустом FIGI — брокер (Tinkoff и др.)
+      const ticker = formData.ticker.trim().toUpperCase()
+      const stockResponse = await api.get(`/api/stocks/${ticker}`)
+      let figi = stockResponse.data?.figi
       if (!figi) {
-        setError('Не удалось найти акцию с таким тикером')
+        try {
+          const brokerRes = await api.get(`/api/broker/stocks/${ticker}`)
+          figi = brokerRes.data?.figi
+        } catch (_) {
+          /* оставляем figi пустым */
+        }
+      }
+
+      if (!figi) {
+        setError('Не удалось найти акцию с таким тикером или у неё нет FIGI')
         return
       }
 
@@ -100,8 +109,15 @@ const BotsPage = () => {
       fetchBots()
     } catch (err) {
       let errorMessage = 'Не удалось создать бота'
-      if (err.response?.data?.message) {
-        errorMessage = err.response.data.message
+      const data = err.response?.data
+      if (typeof data?.message === 'string') {
+        errorMessage = data.message
+      } else if (Array.isArray(data?.errors)) {
+        errorMessage = data.errors
+          .map((e) => e.defaultMessage || e.message || String(e))
+          .join('; ')
+      } else if (typeof data?.detail === 'string') {
+        errorMessage = data.detail
       } else if (err.response?.status === 404) {
         errorMessage = 'Акция с таким тикером не найдена'
       } else if (err.message) {

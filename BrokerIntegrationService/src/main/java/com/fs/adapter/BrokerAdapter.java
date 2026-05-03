@@ -7,8 +7,10 @@ import com.fs.dto.TickersDto;
 import com.fs.dto.BrokerOrderDto;
 import com.fs.dto.CreateBrokerOrderDto;
 import com.fs.dto.OrderBookDto;
+import com.fs.dto.BrokerCandleDto;
 import com.fs.model.Stock;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -84,4 +86,11 @@ public interface BrokerAdapter {
      * Проверить доступность брокера
      */
     boolean isAvailable();
+
+    /**
+     * Исторические свечи по инструменту за период.
+     *
+     * @param interval код интервала (например DAY, HOUR, MIN_5, MIN_15, MIN_1)
+     */
+    List<BrokerCandleDto> getHistoricCandles(String figi, Instant from, Instant to, String interval);
 }

@@ -29,6 +29,14 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         return UserPrincipal.create(user);
     }
 
+    /** Загрузка пользователя по ID (для refresh token). */
+    @Transactional
+    public UserDetails loadUserById(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UsernameNotFoundException("User Not Found with id: " + id));
+        return UserPrincipal.create(user);
+    }
+
     public static class UserPrincipal implements UserDetails {
         private Long id;
         private String username;

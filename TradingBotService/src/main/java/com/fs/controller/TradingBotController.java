@@ -45,11 +45,22 @@ public class TradingBotController {
     @PutMapping("/{botId}/status")
     @Operation(summary = "Изменить статус бота")
     public ResponseEntity<BotDto> updateBotStatus(
+            @RequestHeader("X-User-Id") String userId,
             @PathVariable String botId,
             @RequestParam BotStatus status) {
         log.info("Изменение статуса бота {} на {}", botId, status);
-        BotDto bot = botService.updateBotStatus(botId, status);
+        BotDto bot = botService.updateBotStatus(userId, botId, status);
         return ResponseEntity.ok(bot);
+    }
+
+    @DeleteMapping("/{botId}")
+    @Operation(summary = "Удалить бота")
+    public ResponseEntity<Void> deleteBot(
+            @RequestHeader("X-User-Id") String userId,
+            @PathVariable String botId) {
+        log.info("Удаление бота {} пользователем {}", botId, userId);
+        botService.deleteBot(userId, botId);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/admin/stats/bots")

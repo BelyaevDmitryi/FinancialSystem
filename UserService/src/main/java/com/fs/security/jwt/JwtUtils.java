@@ -21,8 +21,11 @@ public class JwtUtils {
     @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${jwt.expiration}")
+    @Value("${jwt.expiration:900000}")
     private Long expiration;
+
+    @Value("${jwt.refresh-expiration:604800000}")
+    private Long refreshExpiration;
 
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
@@ -53,19 +56,33 @@ public class JwtUtils {
         return extractExpiration(token).before(new Date());
     }
 
+    private static final String CLAIM_TYPE = "type";
+    private static final String TYPE_ACCESS = "access";
+    private static final String TYPE_REFRESH = "refresh";
+
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
-        // Храним userId в subject токена для использования в микросервисах
         String userId = String.valueOf(((UserDetailsServiceImpl.UserPrincipal) userDetails).getId());
-        
-        // Добавляем роли в claims
+        claims.put(CLAIM_TYPE, TYPE_ACCESS);
         if (userDetails.getAuthorities() != null) {
             claims.put("roles", userDetails.getAuthorities().stream()
                     .map(auth -> auth.getAuthority())
                     .toList());
         }
-        
-        return createToken(claims, userId);
+        return createToken(claims, userId, expiration);
+    }
+
+    /** Генерация refresh-токена (длинный срок жизни, только для обмена на access). */
+    public String generateRefreshToken(UserDetails userDetails) {
+        Map<String, Object> claims = new HashMap<>();
+        String userId = String.valueOf(((UserDetailsServiceImpl.UserPrincipal) userDetails).getId());
+        claims.put(CLAIM_TYPE, TYPE_REFRESH);
+        if (userDetails.getAuthorities() != null) {
+            claims.put("roles", userDetails.getAuthorities().stream()
+                    .map(auth -> auth.getAuthority())
+                    .toList());
+        }
+        return createToken(claims, userId, refreshExpiration);
     }
     
     public String extractUserId(String token) {
@@ -82,14 +99,29 @@ public class JwtUtils {
         return java.util.Collections.emptyList();
     }
 
-    private String createToken(Map<String, Object> claims, String subject) {
+    private String createToken(Map<String, Object> claims, String subject, long validityMs) {
         return Jwts.builder()
                 .claims(claims)
                 .subject(subject)
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + expiration))
+                .expiration(new Date(System.currentTimeMillis() + validityMs))
                 .signWith(getSigningKey())
                 .compact();
+    }
+
+    /** Валидация refresh-токена: подпись и срок, тип claim = refresh. */
+    public boolean validateRefreshToken(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            Object type = claims.get(CLAIM_TYPE);
+            return TYPE_REFRESH.equals(type) && !isTokenExpired(token);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public Long getExpirationMs() {
+        return expiration;
     }
 
     public Boolean validateToken(String token, UserDetails userDetails) {

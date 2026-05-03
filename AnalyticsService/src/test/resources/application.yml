@@ -1,0 +1,4 @@
+# Минимальная конфигурация для тестов (без Eureka и др.)
+eureka:
+  client:
+    enabled: false

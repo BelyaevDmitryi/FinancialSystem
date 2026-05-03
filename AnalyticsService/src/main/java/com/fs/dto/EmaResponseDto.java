@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -15,4 +16,8 @@ public class EmaResponseDto {
     private BigDecimal ema;
     private LocalDateTime timestamp;
     private Integer period;
+    /**
+     * Серия значений EMA по периодам для построения графика (последнее значение = ema).
+     */
+    private List<BigDecimal> values;
 }

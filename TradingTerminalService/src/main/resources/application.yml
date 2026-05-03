@@ -67,6 +67,11 @@ springdoc:
   api-docs:
     path: /api-docs
 
+# Тот же JWT_SECRET, что в UserService и ApiGateway (для проверки токена)
+jwt:
+  secret: ${JWT_SECRET:5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437}
+
+# В продакшене НЕ задавайте BROKER_ACCOUNT_ID — счёт берётся из UserService по X-User-Id (свой счёт у брокера для каждого пользователя).
 broker:
   default-account-id: ${BROKER_ACCOUNT_ID:}
   integration:

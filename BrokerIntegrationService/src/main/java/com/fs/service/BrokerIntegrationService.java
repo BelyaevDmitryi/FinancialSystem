@@ -1,9 +1,11 @@
 package com.fs.service;
 
 import com.fs.adapter.BrokerAdapter;
+import com.fs.dto.BrokerCandleDto;
 import com.fs.dto.BrokerOrderDto;
 import com.fs.dto.CreateBrokerOrderDto;
 import com.fs.dto.FigiesDto;
+import com.fs.dto.HistoricCandlesDto;
 import com.fs.dto.OrderBookDto;
 import com.fs.dto.StocksDto;
 import com.fs.dto.StocksPricesDto;
@@ -15,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -180,5 +183,23 @@ public class BrokerIntegrationService {
      */
     public List<String> getAvailableBrokers() {
         return brokerFactory.getAvailableBrokers();
+    }
+
+    /**
+     * Исторические свечи по FIGI за период.
+     */
+    public HistoricCandlesDto getHistoricCandles(String figi, Instant from, Instant to, String interval) {
+        return getHistoricCandles(figi, from, to, interval, defaultBroker);
+    }
+
+    /**
+     * Исторические свечи с указанием брокера.
+     */
+    public HistoricCandlesDto getHistoricCandles(String figi, Instant from, Instant to, String interval,
+                                                   String brokerName) {
+        log.debug("Getting historic candles for {} from broker {} interval {}", figi, brokerName, interval);
+        BrokerAdapter adapter = brokerFactory.getBrokerAdapter(brokerName);
+        List<BrokerCandleDto> candles = adapter.getHistoricCandles(figi, from, to, interval);
+        return new HistoricCandlesDto(figi, interval, candles);
     }
 }

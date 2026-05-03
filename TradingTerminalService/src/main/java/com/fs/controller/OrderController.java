@@ -53,33 +53,48 @@ public class OrderController {
     }
 
     @GetMapping("/{orderId}")
-    @Operation(summary = "Получить ордер по ID")
-    public ResponseEntity<OrderDto> getOrder(@PathVariable String orderId) {
-        log.info("Получение ордера: {}", orderId);
-        OrderDto order = orderService.getOrder(orderId);
+    @Operation(summary = "Получить ордер по ID (только свой)")
+    public ResponseEntity<OrderDto> getOrder(
+            @RequestHeader("X-User-Id") String userId,
+            @PathVariable String orderId) {
+        log.info("Получение ордера {} для пользователя: {}", orderId, userId);
+        OrderDto order = orderService.getOrder(orderId, userId);
         return ResponseEntity.ok(order);
     }
 
     @PostMapping("/{orderId}/execute")
-    @Operation(summary = "Исполнить ордер")
-    public ResponseEntity<OrderDto> executeOrder(@PathVariable String orderId) {
-        log.info("Исполнение ордера: {}", orderId);
-        OrderDto order = orderService.executeOrder(orderId);
+    @Operation(summary = "Исполнить ордер (только свой)")
+    public ResponseEntity<OrderDto> executeOrder(
+            @RequestHeader("X-User-Id") String userId,
+            @PathVariable String orderId) {
+        log.info("Исполнение ордера {} для пользователя: {}", orderId, userId);
+        OrderDto order = orderService.executeOrder(orderId, userId);
         return ResponseEntity.ok(order);
     }
 
     @PostMapping("/{orderId}/cancel")
-    @Operation(summary = "Отменить ордер")
-    public ResponseEntity<OrderDto> cancelOrder(@PathVariable String orderId) {
-        log.info("Отмена ордера: {}", orderId);
-        OrderDto order = orderService.cancelOrder(orderId);
+    @Operation(summary = "Отменить ордер (только свой)")
+    public ResponseEntity<OrderDto> cancelOrder(
+            @RequestHeader("X-User-Id") String userId,
+            @PathVariable String orderId) {
+        log.info("Отмена ордера {} для пользователя: {}", orderId, userId);
+        OrderDto order = orderService.cancelOrder(orderId, userId);
         return ResponseEntity.ok(order);
     }
 
+    @GetMapping("/stats")
+    @Operation(summary = "Статистика ордеров текущего пользователя")
+    public ResponseEntity<com.fs.dto.OrderStatsDto> getMyOrderStats(
+            @RequestHeader("X-User-Id") String userId) {
+        log.info("Получение статистики ордеров для пользователя: {}", userId);
+        return ResponseEntity.ok(orderService.getOrderStatsForUser(userId));
+    }
+
     @GetMapping("/admin/stats/orders")
-    @Operation(summary = "Получить статистику ордеров (для админ-панели)")
-    public ResponseEntity<com.fs.dto.OrderStatsDto> getOrderStats() {
-        log.info("Получение статистики ордеров");
-        return ResponseEntity.ok(orderService.getOrderStats());
+    @Operation(summary = "Получить статистику всех ордеров (только для администратора)")
+    public ResponseEntity<com.fs.dto.OrderStatsDto> getOrderStats(
+            @RequestHeader(value = "X-User-Roles", required = false) String rolesHeader) {
+        log.info("Получение глобальной статистики ордеров (admin)");
+        return ResponseEntity.ok(orderService.getOrderStats(rolesHeader));
     }
 }

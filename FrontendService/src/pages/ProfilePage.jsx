@@ -15,8 +15,20 @@ import {
   DialogContent,
   DialogActions,
   IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material'
-import { PhotoCamera } from '@mui/icons-material'
+import { PhotoCamera, Add, Edit, Delete } from '@mui/icons-material'
 import { useAuth } from '../context/AuthContext'
 import api from '../services/api'
 
@@ -42,8 +54,35 @@ const ProfilePage = () => {
   })
   const [passwordError, setPasswordError] = useState('')
 
+  // Счета у брокеров
+  const [brokers, setBrokers] = useState([])
+  const [brokersLoading, setBrokersLoading] = useState(false)
+  const [brokersLoadError, setBrokersLoadError] = useState('')
+  const [brokerAccounts, setBrokerAccounts] = useState([])
+  const [brokerAccountsLoading, setBrokerAccountsLoading] = useState(false)
+  const [brokerAccountsLoadError, setBrokerAccountsLoadError] = useState('')
+  const [addAccountOpen, setAddAccountOpen] = useState(false)
+  const [editAccountOpen, setEditAccountOpen] = useState(false)
+  const [accountToEdit, setAccountToEdit] = useState(null)
+  const [addAccountForm, setAddAccountForm] = useState({
+    brokerCode: '',
+    externalAccountId: '',
+    displayName: '',
+    isDefault: false,
+  })
+  const [editAccountForm, setEditAccountForm] = useState({ displayName: '', isDefault: false })
+  const [brokerAccountError, setBrokerAccountError] = useState('')
+  const [brokerAccountSaving, setBrokerAccountSaving] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [accountToDelete, setAccountToDelete] = useState(null)
+
   useEffect(() => {
     fetchProfile()
+  }, [])
+
+  useEffect(() => {
+    fetchBrokers()
+    fetchBrokerAccounts()
   }, [])
 
   const fetchProfile = async () => {
@@ -61,6 +100,120 @@ const ProfilePage = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchBrokers = async () => {
+    try {
+      setBrokersLoading(true)
+      setBrokersLoadError('')
+      const response = await api.get('/api/profile/broker-accounts/brokers')
+      setBrokers(response.data || [])
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.error || 'Не удалось загрузить список брокеров'
+      setBrokersLoadError(msg)
+      setBrokers([])
+      console.error('Загрузка брокеров:', err)
+    } finally {
+      setBrokersLoading(false)
+    }
+  }
+
+  const fetchBrokerAccounts = async () => {
+    try {
+      setBrokerAccountsLoading(true)
+      setBrokerAccountsLoadError('')
+      const response = await api.get('/api/profile/broker-accounts')
+      setBrokerAccounts(response.data || [])
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.error || 'Не удалось загрузить счета'
+      setBrokerAccountsLoadError(msg)
+      setBrokerAccounts([])
+      console.error('Загрузка счетов:', err)
+    } finally {
+      setBrokerAccountsLoading(false)
+    }
+  }
+
+  const handleAddBrokerAccount = async () => {
+    if (!addAccountForm.brokerCode || !addAccountForm.externalAccountId?.trim()) {
+      setBrokerAccountError('Выберите брокера и укажите ID счёта у брокера')
+      return
+    }
+    try {
+      setBrokerAccountSaving(true)
+      setBrokerAccountError('')
+      await api.post('/api/profile/broker-accounts', {
+        brokerCode: addAccountForm.brokerCode,
+        externalAccountId: addAccountForm.externalAccountId.trim(),
+        displayName: addAccountForm.displayName?.trim() || null,
+        isDefault: addAccountForm.isDefault,
+      })
+      setAddAccountOpen(false)
+      setAddAccountForm({ brokerCode: '', externalAccountId: '', displayName: '', isDefault: false })
+      setSuccess('Счёт успешно привязан')
+      await fetchBrokerAccounts()
+    } catch (err) {
+      const msg = err.response?.data?.error || err.response?.data?.message || 'Не удалось привязать счёт'
+      setBrokerAccountError(msg)
+    } finally {
+      setBrokerAccountSaving(false)
+    }
+  }
+
+  const handleUpdateBrokerAccount = async () => {
+    if (!accountToEdit) return
+    try {
+      setBrokerAccountSaving(true)
+      setBrokerAccountError('')
+      await api.put(`/api/profile/broker-accounts/${accountToEdit.id}`, {
+        displayName: editAccountForm.displayName?.trim() || null,
+        isDefault: editAccountForm.isDefault,
+      })
+      setEditAccountOpen(false)
+      setAccountToEdit(null)
+      setEditAccountForm({ displayName: '', isDefault: false })
+      setSuccess('Счёт обновлён')
+      await fetchBrokerAccounts()
+    } catch (err) {
+      const msg = err.response?.data?.error || err.response?.data?.message || 'Не удалось обновить счёт'
+      setBrokerAccountError(msg)
+    } finally {
+      setBrokerAccountSaving(false)
+    }
+  }
+
+  const handleDeleteBrokerAccount = async () => {
+    if (!accountToDelete) return
+    try {
+      setBrokerAccountSaving(true)
+      setBrokerAccountError('')
+      await api.delete(`/api/profile/broker-accounts/${accountToDelete.id}`)
+      setDeleteConfirmOpen(false)
+      setAccountToDelete(null)
+      setSuccess('Счёт отвязан')
+      await fetchBrokerAccounts()
+    } catch (err) {
+      const msg = err.response?.data?.error || err.response?.data?.message || 'Не удалось отвязать счёт'
+      setBrokerAccountError(msg)
+    } finally {
+      setBrokerAccountSaving(false)
+    }
+  }
+
+  const openEditAccount = (account) => {
+    setAccountToEdit(account)
+    setEditAccountForm({
+      displayName: account.displayName || '',
+      isDefault: account.isDefault ?? false,
+    })
+    setBrokerAccountError('')
+    setEditAccountOpen(true)
+  }
+
+  const openDeleteConfirm = (account) => {
+    setAccountToDelete(account)
+    setBrokerAccountError('')
+    setDeleteConfirmOpen(true)
   }
 
   const handleSaveProfile = async () => {
@@ -263,6 +416,82 @@ const ProfilePage = () => {
           {success}
         </Alert>
       )}
+
+      {/* Секция «Счета у брокеров» — сразу под заголовком, чтобы была видна */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6">
+            Счета у брокеров
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => {
+              setAddAccountForm({ brokerCode: '', externalAccountId: '', displayName: '', isDefault: false })
+              setBrokerAccountError('')
+              setAddAccountOpen(true)
+            }}
+            disabled={brokersLoading}
+          >
+            Привязать счёт
+          </Button>
+        </Box>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Привяжите счета у брокеров для торговли. Один счёт можно отметить как счёт по умолчанию.
+        </Typography>
+        {(brokersLoadError || brokerAccountsLoadError) && (
+          <Alert severity="warning" sx={{ mb: 2 }} onClose={() => { setBrokersLoadError(''); setBrokerAccountsLoadError('') }}>
+            {brokersLoadError || brokerAccountsLoadError}
+          </Alert>
+        )}
+        {brokerAccountError && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setBrokerAccountError('')}>
+            {brokerAccountError}
+          </Alert>
+        )}
+        {(brokersLoading || brokerAccountsLoading) ? (
+          <Box display="flex" justifyContent="center" py={3}>
+            <CircularProgress size={32} />
+          </Box>
+        ) : brokerAccounts.length === 0 ? (
+          <Typography color="text.secondary">
+            Нет привязанных счетов. Нажмите «Привязать счёт», чтобы добавить счёт у брокера.
+            {brokers.length === 0 && !brokersLoading && !brokersLoadError && ' В системе пока нет брокеров — добавьте их в БД.'}
+          </Typography>
+        ) : (
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Брокер</TableCell>
+                  <TableCell>ID счёта у брокера</TableCell>
+                  <TableCell>Название</TableCell>
+                  <TableCell align="center">По умолчанию</TableCell>
+                  <TableCell align="right">Действия</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {brokerAccounts.map((acc) => (
+                  <TableRow key={acc.id}>
+                    <TableCell>{acc.broker?.name || acc.broker?.code || '—'}</TableCell>
+                    <TableCell>{acc.externalAccountId}</TableCell>
+                    <TableCell>{acc.displayName || '—'}</TableCell>
+                    <TableCell align="center">{acc.isDefault ? 'Да' : ''}</TableCell>
+                    <TableCell align="right">
+                      <IconButton size="small" onClick={() => openEditAccount(acc)} title="Редактировать">
+                        <Edit fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" color="error" onClick={() => openDeleteConfirm(acc)} title="Отвязать">
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Paper>
 
       <Grid container spacing={3} sx={{ mt: 2 }}>
         <Grid item xs={12} md={4}>
@@ -534,6 +763,115 @@ const ProfilePage = () => {
           </Button>
           <Button onClick={handleChangePassword} variant="contained">
             Изменить пароль
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={addAccountOpen} onClose={() => setAddAccountOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Привязать счёт у брокера</DialogTitle>
+        <DialogContent>
+          {brokerAccountError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setBrokerAccountError('')}>
+              {brokerAccountError}
+            </Alert>
+          )}
+          <FormControl fullWidth sx={{ mt: 2, mb: 2 }}>
+            <InputLabel>Брокер</InputLabel>
+            <Select
+              value={addAccountForm.brokerCode}
+              label="Брокер"
+              onChange={(e) => setAddAccountForm({ ...addAccountForm, brokerCode: e.target.value })}
+            >
+              {brokers.map((b) => (
+                <MenuItem key={b.id} value={b.code}>{b.name || b.code}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField
+            fullWidth
+            label="ID счёта у брокера"
+            value={addAccountForm.externalAccountId}
+            onChange={(e) => setAddAccountForm({ ...addAccountForm, externalAccountId: e.target.value })}
+            required
+            sx={{ mb: 2 }}
+            helperText="Идентификатор счёта в системе брокера"
+          />
+          <TextField
+            fullWidth
+            label="Название (необязательно)"
+            value={addAccountForm.displayName}
+            onChange={(e) => setAddAccountForm({ ...addAccountForm, displayName: e.target.value })}
+            sx={{ mb: 2 }}
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={addAccountForm.isDefault}
+                onChange={(e) => setAddAccountForm({ ...addAccountForm, isDefault: e.target.checked })}
+              />
+            }
+            label="Использовать как счёт по умолчанию для торговли"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAddAccountOpen(false)}>Отмена</Button>
+          <Button onClick={handleAddBrokerAccount} variant="contained" disabled={brokerAccountSaving}>
+            {brokerAccountSaving ? <CircularProgress size={24} /> : 'Привязать'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={editAccountOpen} onClose={() => { setEditAccountOpen(false); setAccountToEdit(null) }} maxWidth="sm" fullWidth>
+        <DialogTitle>Редактировать счёт</DialogTitle>
+        <DialogContent>
+          {accountToEdit && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2, mb: 2 }}>
+              Брокер: {accountToEdit.broker?.name || accountToEdit.broker?.code}. ID счёта: {accountToEdit.externalAccountId}
+            </Typography>
+          )}
+          {brokerAccountError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setBrokerAccountError('')}>
+              {brokerAccountError}
+            </Alert>
+          )}
+          <TextField
+            fullWidth
+            label="Название"
+            value={editAccountForm.displayName}
+            onChange={(e) => setEditAccountForm({ ...editAccountForm, displayName: e.target.value })}
+            sx={{ mb: 2 }}
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={editAccountForm.isDefault}
+                onChange={(e) => setEditAccountForm({ ...editAccountForm, isDefault: e.target.checked })}
+              />
+            }
+            label="Счёт по умолчанию для торговли"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setEditAccountOpen(false); setAccountToEdit(null) }}>Отмена</Button>
+          <Button onClick={handleUpdateBrokerAccount} variant="contained" disabled={brokerAccountSaving}>
+            {brokerAccountSaving ? <CircularProgress size={24} /> : 'Сохранить'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteConfirmOpen} onClose={() => { setDeleteConfirmOpen(false); setAccountToDelete(null) }}>
+        <DialogTitle>Отвязать счёт?</DialogTitle>
+        <DialogContent>
+          {accountToDelete && (
+            <Typography>
+              Вы уверены, что хотите отвязать счёт у брокера {accountToDelete.broker?.name || accountToDelete.broker?.code} (ID: {accountToDelete.externalAccountId})?
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setDeleteConfirmOpen(false); setAccountToDelete(null) }}>Отмена</Button>
+          <Button onClick={handleDeleteBrokerAccount} color="error" variant="contained" disabled={brokerAccountSaving}>
+            {brokerAccountSaving ? <CircularProgress size={24} /> : 'Отвязать'}
           </Button>
         </DialogActions>
       </Dialog>

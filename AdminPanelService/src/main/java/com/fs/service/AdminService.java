@@ -22,12 +22,12 @@ public class AdminService {
     private final TradingTerminalServiceClient terminalServiceClient;
     private final TradingBotServiceClient botServiceClient;
 
-    public SystemStatsDto getSystemStats() {
+    public SystemStatsDto getSystemStats(String userId, String rolesHeader) {
         log.info("Получение статистики системы");
         
         try {
             Long totalUsers = userServiceClient.getTotalUsers();
-            OrderStatsDto orderStats = terminalServiceClient.getOrderStats();
+            OrderStatsDto orderStats = terminalServiceClient.getOrderStats(userId, rolesHeader);
             BotStatsDto botStats = botServiceClient.getBotStats();
 
             return new SystemStatsDto(

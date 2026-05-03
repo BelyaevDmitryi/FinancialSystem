@@ -46,10 +46,14 @@ const AnalyticsPage = () => {
     }
   }
 
-  const chartData = data?.values?.map((value, index) => ({
-    name: `Точка ${index + 1}`,
-    value: value,
-  })) || []
+  const chartData = (data?.values && data.values.length > 0)
+    ? data.values.map((value, index) => ({
+        name: `Точка ${index + 1}`,
+        value: Number(value),
+      }))
+    : (data?.sma != null || data?.ema != null)
+      ? [{ name: formData.indicator, value: Number(data.sma ?? data.ema) }]
+      : []
 
   return (
     <Box>
@@ -112,6 +116,11 @@ const AnalyticsPage = () => {
           <Typography variant="h6" gutterBottom>
             Результат: {formData.indicator}
           </Typography>
+          {(data.sma != null || data.ema != null) && (
+            <Typography variant="body1" sx={{ mb: 2 }}>
+              {formData.indicator}({formData.period}) = {Number(data.sma ?? data.ema).toFixed(2)}
+            </Typography>
+          )}
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={400}>
               <LineChart data={chartData}>

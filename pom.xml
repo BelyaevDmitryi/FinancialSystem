@@ -21,5 +21,7 @@
         <module>TradingBotService</module>
         <module>AdminPanelService</module>
         <module>DashboardService</module>
+        <module>MarketHistoryService</module>
+        <module>BotOptimizationService</module>
     </modules>
 </project>

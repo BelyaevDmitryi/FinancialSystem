@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -15,4 +16,8 @@ public class SmaResponseDto {
     private BigDecimal sma;
     private LocalDateTime timestamp;
     private Integer period;
+    /**
+     * Серия значений SMA по периодам для построения графика (последнее значение = sma).
+     */
+    private List<BigDecimal> values;
 }

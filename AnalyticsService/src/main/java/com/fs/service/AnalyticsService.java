@@ -26,50 +26,63 @@ public class AnalyticsService {
     private final Random random = new Random();
 
     /**
-     * Вычисляет Simple Moving Average (SMA)
+     * Минимальное число точек для построения серии на графике (число цен = period * CHART_MULTIPLIER).
+     */
+    private static final int CHART_MULTIPLIER = 3;
+
+    /**
+     * Вычисляет Simple Moving Average (SMA) и серию значений для графика.
      */
     public SmaResponseDto calculateSMA(AnalyticsRequestDto request) {
         List<PriceDataDto> prices = request.getPriceData();
         int period = request.getPeriod();
+        int pointsForChart = Math.max(period, period * CHART_MULTIPLIER);
 
         // Если priceData не предоставлен, получаем текущую цену и генерируем историю
         if (prices == null || prices.isEmpty()) {
-            prices = generatePriceHistory(request.getFigi(), period);
+            prices = generatePriceHistory(request.getFigi(), pointsForChart);
         }
 
         if (prices.size() < period) {
             throw new IllegalArgumentException("Недостаточно данных для расчета SMA. Требуется минимум " + period + " точек данных.");
         }
 
-        List<PriceDataDto> recentPrices = prices.stream()
-                .sorted((a, b) -> b.getTimestamp().compareTo(a.getTimestamp()))
-                .limit(period)
+        List<PriceDataDto> sortedPrices = prices.stream()
+                .sorted((a, b) -> a.getTimestamp().compareTo(b.getTimestamp()))
                 .collect(Collectors.toList());
 
-        BigDecimal sum = recentPrices.stream()
-                .map(PriceDataDto::getPrice)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Скользящая SMA для каждой точки (начиная с индекса period - 1)
+        List<BigDecimal> smaValues = new ArrayList<>();
+        for (int i = period - 1; i < sortedPrices.size(); i++) {
+            BigDecimal sum = BigDecimal.ZERO;
+            for (int j = i - period + 1; j <= i; j++) {
+                sum = sum.add(sortedPrices.get(j).getPrice());
+            }
+            smaValues.add(sum.divide(BigDecimal.valueOf(period), MATH_CONTEXT));
+        }
 
-        BigDecimal sma = sum.divide(BigDecimal.valueOf(period), MATH_CONTEXT);
+        BigDecimal sma = smaValues.isEmpty() ? BigDecimal.ZERO : smaValues.get(smaValues.size() - 1);
 
         return new SmaResponseDto(
                 request.getFigi(),
                 sma,
                 LocalDateTime.now(),
-                period
+                period,
+                smaValues
         );
     }
 
     /**
-     * Вычисляет Exponential Moving Average (EMA)
+     * Вычисляет Exponential Moving Average (EMA) и серию значений для графика.
      */
     public EmaResponseDto calculateEMA(AnalyticsRequestDto request) {
         List<PriceDataDto> prices = request.getPriceData();
         int period = request.getPeriod();
+        int pointsForChart = Math.max(period, period * CHART_MULTIPLIER);
 
         // Если priceData не предоставлен, получаем текущую цену и генерируем историю
         if (prices == null || prices.isEmpty()) {
-            prices = generatePriceHistory(request.getFigi(), period);
+            prices = generatePriceHistory(request.getFigi(), pointsForChart);
         }
 
         if (prices.size() < period) {
@@ -83,19 +96,23 @@ public class AnalyticsService {
         BigDecimal multiplier = BigDecimal.valueOf(2.0)
                 .divide(BigDecimal.valueOf(period + 1), MATH_CONTEXT);
 
+        List<BigDecimal> emaValues = new ArrayList<>();
         BigDecimal ema = sortedPrices.get(0).getPrice();
+        emaValues.add(ema);
 
         for (int i = 1; i < sortedPrices.size(); i++) {
             BigDecimal price = sortedPrices.get(i).getPrice();
             ema = price.multiply(multiplier)
                     .add(ema.multiply(BigDecimal.ONE.subtract(multiplier, MATH_CONTEXT), MATH_CONTEXT), MATH_CONTEXT);
+            emaValues.add(ema);
         }
 
         return new EmaResponseDto(
                 request.getFigi(),
                 ema,
                 LocalDateTime.now(),
-                period
+                period,
+                emaValues
         );
     }
 

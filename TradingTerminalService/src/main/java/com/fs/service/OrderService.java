@@ -2,13 +2,14 @@ package com.fs.service;
 
 import com.fs.domain.Order;
 import com.fs.domain.OrderStatus;
-import com.fs.domain.OrderType;
 import com.fs.dto.BrokerOrderDto;
+import com.fs.exception.OrderNotFoundException;
 import com.fs.dto.CreateBrokerOrderDto;
 import com.fs.dto.CreateOrderDto;
 import com.fs.dto.OrderDto;
 import com.fs.dto.OrderStatsDto;
 import com.fs.feignclient.BrokerIntegrationServiceClient;
+import com.fs.feignclient.UserServiceClient;
 import com.fs.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,9 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -30,10 +29,15 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final BrokerIntegrationServiceClient brokerIntegrationServiceClient;
-    
+    private final UserServiceClient userServiceClient;
+
+    /** Только для тестов/локальной разработки. В продакшене оставьте пустым — счёт берётся из UserService по userId (свой счёт для каждого пользователя). */
     @Value("${broker.default-account-id:}")
     private String defaultAccountId;
-    
+
+    @Value("${broker.default-broker:TINKOFF}")
+    private String defaultBrokerCode;
+
     @Value("${broker.integration.enabled:true}")
     private boolean brokerIntegrationEnabled;
 
@@ -112,18 +116,22 @@ public class OrderService {
     }
     
     /**
-     * Получить accountId для пользователя
-     * В реальной системе это должно быть из базы данных или конфигурации
+     * Получить accountId (счёт у брокера) для пользователя.
+     * В продакшене всегда берётся из UserService по userId (свой счёт для каждого пользователя).
+     * Для тестов/локальной разработки можно задать broker.default-account-id в конфиге.
      */
     private String getAccountIdForUser(String userId) {
-        // TODO: Реализовать получение accountId из базы данных или конфигурации
-        // Пока используем дефолтный или userId как accountId
         if (defaultAccountId != null && !defaultAccountId.isEmpty()) {
-            log.debug("Используется дефолтный accountId: {}", defaultAccountId);
+            log.debug("Используется счёт из конфига (broker.default-account-id): {}", defaultAccountId);
             return defaultAccountId;
         }
-        log.debug("Используется userId как accountId: {}", userId);
-        return userId; // Временное решение
+        var dto = userServiceClient.getDefaultBrokerAccount(userId, defaultBrokerCode);
+        if (dto == null || dto.getExternalAccountId() == null || dto.getExternalAccountId().isBlank()) {
+            throw new IllegalStateException(
+                    "Счёт по умолчанию для брокера " + defaultBrokerCode + " не привязан. Добавьте счёт в профиле.");
+        }
+        log.debug("Счёт для пользователя {} у брокера {}: {}", userId, defaultBrokerCode, dto.getExternalAccountId());
+        return dto.getExternalAccountId();
     }
 
     public List<OrderDto> getUserOrders(String userId) {
@@ -143,11 +151,15 @@ public class OrderService {
     }
 
     @Transactional
-    public OrderDto executeOrder(String orderId) {
-        log.info("Исполнение ордера: {}", orderId);
+    public OrderDto executeOrder(String orderId, String userId) {
+        log.info("Исполнение ордера: {} для пользователя: {}", orderId, userId);
         Long orderIdLong = parseOrderId(orderId);
+        Long userIdLong = parseUserId(userId);
         Order order = orderRepository.findById(orderIdLong)
-                .orElseThrow(() -> new IllegalArgumentException("Ордер не найден: " + orderId));
+                .orElseThrow(() -> new OrderNotFoundException("Ордер не найден"));
+        if (!order.getUserId().equals(userIdLong)) {
+            throw new OrderNotFoundException("Ордер не найден");
+        }
 
         if (order.getStatus() != OrderStatus.PENDING) {
             throw new IllegalStateException("Ордер уже обработан. Текущий статус: " + order.getStatus());
@@ -209,11 +221,15 @@ public class OrderService {
     }
 
     @Transactional
-    public OrderDto cancelOrder(String orderId) {
-        log.info("Отмена ордера: {}", orderId);
+    public OrderDto cancelOrder(String orderId, String userId) {
+        log.info("Отмена ордера: {} для пользователя: {}", orderId, userId);
         Long orderIdLong = parseOrderId(orderId);
+        Long userIdLong = parseUserId(userId);
         Order order = orderRepository.findById(orderIdLong)
-                .orElseThrow(() -> new IllegalArgumentException("Ордер не найден: " + orderId));
+                .orElseThrow(() -> new OrderNotFoundException("Ордер не найден"));
+        if (!order.getUserId().equals(userIdLong)) {
+            throw new OrderNotFoundException("Ордер не найден");
+        }
 
         if (order.getStatus() != OrderStatus.PENDING) {
             throw new IllegalStateException("Невозможно отменить ордер. Текущий статус: " + order.getStatus());
@@ -242,10 +258,14 @@ public class OrderService {
         return convertToDto(savedOrder);
     }
 
-    public OrderDto getOrder(String orderId) {
+    public OrderDto getOrder(String orderId, String userId) {
         Long orderIdLong = parseOrderId(orderId);
+        Long userIdLong = parseUserId(userId);
         Order order = orderRepository.findById(orderIdLong)
-                .orElseThrow(() -> new IllegalArgumentException("Ордер не найден: " + orderId));
+                .orElseThrow(() -> new OrderNotFoundException("Ордер не найден"));
+        if (!order.getUserId().equals(userIdLong)) {
+            throw new OrderNotFoundException("Ордер не найден");
+        }
         return convertToDto(order);
     }
     
@@ -265,16 +285,35 @@ public class OrderService {
         }
     }
 
-    public OrderStatsDto getOrderStats() {
+    /**
+     * Статистика ордеров только для текущего пользователя (по X-User-Id).
+     */
+    public OrderStatsDto getOrderStatsForUser(String userId) {
+        Long userIdLong = parseUserId(userId);
+        List<Order> userOrders = orderRepository.findByUserId(userIdLong);
+        long totalOrders = userOrders.size();
+        Map<String, Long> ordersByStatus = userOrders.stream()
+                .collect(Collectors.groupingBy(
+                        order -> order.getStatus().name(),
+                        Collectors.counting()
+                ));
+        return new OrderStatsDto(totalOrders, ordersByStatus);
+    }
+
+    /**
+     * Глобальная статистика ордеров (для админ-панели). В продакшене вызывать только с ролью ROLE_ADMIN.
+     */
+    public OrderStatsDto getOrderStats(String rolesHeader) {
+        if (rolesHeader == null || !rolesHeader.contains("ROLE_ADMIN")) {
+            throw new IllegalStateException("Доступ запрещён. Требуется роль администратора.");
+        }
         List<Order> allOrders = orderRepository.findAll();
-        Long totalOrders = (long) allOrders.size();
-        
+        long totalOrders = allOrders.size();
         Map<String, Long> ordersByStatus = allOrders.stream()
                 .collect(Collectors.groupingBy(
                         order -> order.getStatus().name(),
                         Collectors.counting()
                 ));
-        
         return new OrderStatsDto(totalOrders, ordersByStatus);
     }
 

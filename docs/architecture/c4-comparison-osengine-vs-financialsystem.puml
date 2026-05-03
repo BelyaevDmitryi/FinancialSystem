@@ -1,0 +1,83 @@
+@startuml osengine-vs-financialsystem
+' Сравнение логической модели OsEngine (десктопный комплект) и FinancialSystem (распределённые контейнеры).
+' Не C4 уровня Context/Container одной системы — намеренно «две колонки» для стейкхолдеров.
+' Правило 033: без Level 4 (классы); ссылка на детали: c4-containers-financialsystem.puml
+
+!theme plain
+title Сравнение архитектур: OsEngine (референс) vs FinancialSystem (модульная цель)
+
+skinparam defaultTextAlignment center
+skinparam wrapWidth 200
+skinparam rectangle {
+  roundCorner 12
+  shadowing false
+}
+skinparam package {
+  borderColor #333333
+  fontStyle bold
+}
+
+left to right direction
+
+package "OsEngine\nhttps://github.com/AlexWan/OsEngine" as P_OS #E3F2FD {
+  rectangle "Слой роботов\n(скрипты, API стабильно)" as OSBots
+  rectangle "Data / OData\nзагрузка истории,\nсвечи, стакан, тики" as OSData
+  rectangle "Tester\nэмулятор биржи,\nнесколько ТФ/инструментов" as OSTest
+  rectangle "Optimizer\nсетка параметров,\nметрики" as OSOpt
+  rectangle "Bot Station\nlive-торговля" as OSStation
+
+  OSBots -[dashed,#1565C0]down-> OSData : файлы / лок.\nконвейер
+  OSData -[dashed,#1565C0]left-> OSTest
+  OSTest -[dashed,#1565C0]up-> OSOpt
+  OSStation -[dashed,#1565C0]down-> OSBots : сигналы\nв бой
+
+  note bottom of P_OS
+    **Логический «монолит пользовательской машины»:**
+    несколько **десктоп-приложений** (.NET / C#),
+    связь через **локальные ресурсы** и процессы,
+    **нет** облачного service discovery между EXE.
+  end note
+}
+
+package "FinancialSystem\n(Maven-монорепозиторий)" as P_FS #E8F5E9 {
+  rectangle "Eureka Server\nреестр сервисов" as FSEur
+  rectangle "API Gateway\nединая точка входа\n8090, JWT" as FSGW
+  rectangle "TradingBotService\nроботы, scheduler" as FSBot
+  rectangle "PriceService +\nBrokerIntegrationService\nкотировки, брокер" as FSMarket
+  rectangle "TradingTerminalService\nордера" as FSTerm
+  rectangle "AnalyticsService\nиндикаторы" as FSAn
+  rectangle "UserService, AdminPanel,\nDashboard, …" as FSOther
+
+  rectangle "План (нет в pom сейчас)\nBacktestService,\nOptimizerService,\nfs-trading-core" as FSFuture #FFFDE7
+
+  FSEur -[hidden]down- FSGW
+  FSGW -[#2E7D32]down-> FSBot : /api/bots/**
+  FSGW -[#2E7D32]down-> FSMarket
+  FSGW -[#2E7D32]down-> FSTerm
+  FSGW -[#2E7D32]down-> FSAn
+  FSGW -[#2E7D32]down-> FSOther
+  FSBot -[#1B5E20]down-> FSAn : Feign
+  FSBot -[#1B5E20]down-> FSMarket : Feign
+  FSBot -[#1B5E20]down-> FSTerm : Feign
+  FSBot -[hidden]right- FSFuture
+
+  note bottom of P_FS
+    **Модульность:** каждый прямоугольник (кроме плана) —
+    **отдельный Spring Boot** и **свой жизненный цикл**;
+    между ними **HTTP + Eureka (lb://)** и **OpenFeign**.
+    См. **c4-containers-financialsystem.puml**.
+  end note
+}
+
+P_OS -[hidden]right- P_FS
+
+legend right
+  |= Функция OsEngine |= Контур FinancialSystem |
+  | Bot Station + скрипты | TradingBotService + Gateway |
+  | Data / OData | BrokerIntegration + PriceService (+ БД истории по дорожной карте) |
+  | Tester | BacktestService (**план**, фаза C) |
+  | Optimizer | OptimizerService / batch (**план**, фаза D) |
+  | Индикаторы в платформе | AnalyticsService |
+endlegend
+
+@enduml

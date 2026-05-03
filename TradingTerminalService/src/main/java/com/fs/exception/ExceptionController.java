@@ -42,6 +42,13 @@ public class ExceptionController {
         return ResponseEntity.badRequest().body(error);
     }
 
+    @ExceptionHandler(OrderNotFoundException.class)
+    public ResponseEntity<ErrorDto> handleOrderNotFoundException(OrderNotFoundException e) {
+        log.warn("Ордер не найден или доступ запрещён: {}", e.getMessage());
+        ErrorDto error = new ErrorDto(HttpStatus.NOT_FOUND.value(), "Ордер не найден");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ErrorDto> handleIllegalStateException(IllegalStateException e) {
         log.error("Ошибка состояния: {}", e.getMessage());
