@@ -2,7 +2,7 @@
 
 Документ описывает **пошаговые алгоритмы** развития монорепозитория FinancialSystem до функциональной близости с [OsEngine](https://github.com/AlexWan/OsEngine) (слой роботов, исторические данные, тестер, оптимизатор, станция роботов) с сохранением стека **Java + Spring** и максимальным переиспользованием текущих микросервисов.
 
-**Версия документа:** 1.1 (актуализация: сравнение архитектур OsEngine ↔ FinancialSystem, трассировка требований, решение по владельцу истории для текущего репозитория).
+**Версия документа:** 1.2 (актуализация: `MarketHistoryService`, `BotOptimizationService` (backtest + optimizer), `JournalService` в pom; фазы A/C/D — частично выполнено).
 
 <a id="section-toc"></a>
 
@@ -72,11 +72,11 @@
 | Аспект | OsEngine ([репозиторий](https://github.com/AlexWan/OsEngine)) | FinancialSystem (текущий монорепозиторий) |
 |--------|----------------------------------------------------------------|---------------------------------------------|
 | **Развёртывание** | Набор десктоп-приложений (.NET / C#), локальная установка | Микросервисы Spring Boot, **Eureka**, **Spring Cloud Gateway**, контейнеры / облако |
-| **Данные и история** | Отдельное приложение *OData* / *Data*: загрузка свечей, стаканов, тиков из множества источников | `BrokerIntegrationService` (интеграция, в т.ч. Tinkoff), `PriceService` (актуальные цены / Redis-ориентир в плане) — **централизованного хранилища OHLCV в БД пока нет** |
+| **Данные и история** | Отдельное приложение *OData* / *Data*: загрузка свечей, стаканов, тиков из множества источников | `MarketHistoryService` (OHLCV в PostgreSQL, импорт через брокера), `BrokerIntegrationService`, `PriceService` (актуальные цены, Redis-кэш) — **фаза A: частично выполнено** |
 | **Стратегии / роботы** | Слой скриптов (аналог Wealth-Lab / NinjaScript), обратная совместимость API | `TradingBotService`: стратегии по enum (`MACD_CROSSOVER`, `SMA_CROSSOVER`, …), расписание тиков, вызовы `AnalyticsService` и терминала |
-| **Тестер** | *Tester*: эмулятор биржи, **несколько стратегий и таймфреймов**, единый портфель | Пока отсутствует как сервис → **фаза C (`BacktestService`)**, первая итерация: **один инструмент + один прогон стратегии**; мульти-инструмент / единый портфель — расширение после DoD фазы C |
-| **Оптимизатор** | *Optimizer*: подбор параметров | Пока отсутствует → **фаза D** |
-| **Станция роботов** | *Bot station*: запуск роботов в бой | `TradingBotService` + `TradingTerminalService` + риск/аудит (**фаза E**) |
+| **Тестер** | *Tester*: эмулятор биржи, **несколько стратегий и таймфреймов**, единый портфель | `BotOptimizationService` (пакет `com.fs.backtest`, `POST /api/backtest/run`) — **фаза C: частично выполнено** (один инструмент + один прогон; мульти-стратегия / единый портфель — вне v1) |
+| **Оптимизатор** | *Optimizer*: подбор параметров | `BotOptimizationService` (grid search, `POST /api/bot-optimization/grid`) — **фаза D: частично выполнено** |
+| **Станция роботов** | *Bot station*: запуск роботов в бой | `TradingBotService` + `TradingTerminalService` + `JournalService` + риск/аудит (**фаза E**, в работе) |
 | **Индикаторы** | Встроены в платформу роботов | `AnalyticsService` (SMA, EMA, MACD, волатильность и т.д.) |
 | **Коннекторы** | Десятки бирж и data-only провайдеров | По сути **один торговый адаптер** (`TinkoffBrokerAdapter`); расширение → **фаза F** |
 | **UI** | Отдельные программы под каждую роль | `DashboardService`, `AdminPanelService`, BFF под фронт через Gateway (`/api/...`) |
@@ -122,10 +122,10 @@
 | Подсистема OsEngine | Назначение | Модуль(и) FinancialSystem |
 |---------------------|------------|---------------------------|
 | Слой роботов / стратегий | Сигналы, параметры, исполнение (скриптовый слой OsEngine) | `TradingBotService` (+ `fs-trading-core` / SPI стратегий, фаза B) |
-| Data (OData) | История: бары, при необходимости тики/стакан | `BrokerIntegrationService` (pull из провайдера), **`PriceService` как владелец БД баров по умолчанию** ([4.3](#history-service-choice)) или опционально `MarketDataService` |
-| Tester | Симуляция на истории, единый портфель | Новый `BacktestService` (или изолированный пакет + API) |
-| Optimizer | Перебор параметров, метрики | Новый `OptimizerService` или Spring Batch + очередь |
-| Bot Station | Запуск/остановка роботов в бою | `TradingBotService` + `TradingTerminalService` + `BrokerIntegrationService` |
+| Data (OData) | История: бары, при необходимости тики/стакан | **`MarketHistoryService`** (владелец OHLCV в PostgreSQL), `BrokerIntegrationService` (pull из провайдера), `PriceService` (последняя цена, Redis) — фаза A **частично выполнено** |
+| Tester | Симуляция на истории, единый портфель | **`BotOptimizationService`** (`com.fs.backtest`, `/api/backtest/**`) — фаза C **частично выполнено** |
+| Optimizer | Перебор параметров, метрики | **`BotOptimizationService`** (grid search, `/api/bot-optimization/**`) — фаза D **частично выполнено** |
+| Bot Station | Запуск/остановка роботов в бою | `TradingBotService` + `TradingTerminalService` + `JournalService` + `BrokerIntegrationService` |
 | Индикаторы / ТА | Расчёты | `AnalyticsService` |
 | Пользователи / счета | Идентичность, привязка к брокеру | `UserService` |
 | UI / агрегация | Дашборд, админка | `DashboardService`, `AdminPanelService` |
@@ -151,16 +151,16 @@
    1.1. Зафиксировать версии JDK, Spring Boot, контракты OpenAPI между сервисами.
    1.2. Определить СУБД для исторических рядов (рекомендация: Postgres + TimescaleDB или отдельное хранилище под нагрузку).
 
-2. ВЫПОЛНИТЬ ФАЗУ A (ядро домена + исторические бары минимально).
+2. ВЫПОЛНИТЬ ФАЗУ A (ядро домена + исторические бары минимально). **Статус: частично выполнено** (`MarketHistoryService`).
    Критерий: по FIGI и таймфрейму можно прочитать непрерывный ряд OHLCV за диапазон дат из API системы.
 
 3. ВЫПОЛНИТЬ ФАЗУ B (абстракция стратегии + единый контракт для live).
    Критерий: добавление новой стратегии = новый класс/бин без правки огромного switch; параметры задаются конфигурацией.
 
-4. ВЫПОЛНИТЬ ФАЗУ C (BacktestService: симулятор).
+4. ВЫПОЛНИТЬ ФАЗУ C (BacktestService: симулятор). **Статус: частично выполнено** (`BotOptimizationService` / `com.fs.backtest`).
    Критерий: прогон той же стратегии на истории без обращения к брокеру; ответ содержит кривую equity и базовые метрики.
 
-5. ВЫПОЛНИТЬ ФАЗУ D (Optimizer).
+5. ВЫПОЛНИТЬ ФАЗУ D (Optimizer). **Статус: частично выполнено** (grid search в `BotOptimizationService`).
    Критерий: параметрическая сетка запускает N прогонов бэктеста; результат сохраняется (лидерборд параметров).
 
 6. ВЫПОЛНИТЬ ФАЗУ E (Bot Station hardening).
@@ -235,7 +235,7 @@
     выбрать Вариант 1 для минимизации модулей
 ```
 
-**Состояние репозитория FinancialSystem (на момент 1.1):** в корневом `pom.xml` перечислены модули `PriceService`, `BrokerIntegrationService`, … без отдельного `MarketDataService` — для старта фазы A **рекомендуется Вариант 1** (расширить `PriceService`: миграции `market_candles`, `GET /candles`, ingestion по расписанию или админ-джобе). Переход на Вариант 2 оформить отдельным ADR при росте нагрузки на чтение истории или смешении ответственности «последняя цена vs архив».
+**Состояние репозитория FinancialSystem (на момент 1.2):** в корневом `pom.xml` есть отдельный модуль **`MarketHistoryService`** (вариант 2 из [4.3](#history-service-choice) реализован). `PriceService` остаётся для актуальных цен и Redis-кэша. Фаза A — **частично выполнено** (ingestion и чтение свечей работают; расширение источников — фаза F).
 
 <a id="algo-ingest-historical-candles"></a>
 
@@ -532,7 +532,9 @@ StrategySignal включает:
 | Модуль | Минимальные правки |
 |--------|-------------------|
 | `BrokerIntegrationService` | Эндпоинт исторических свечей; унификация под интерфейс адаптера |
-| `PriceService` или новый сервис | Запись/чтение баров; при разделении — чёткая граница ответственности |
+| `MarketHistoryService` | Запись/чтение баров (реализовано) |
+| `BotOptimizationService` | Backtest + grid optimizer (реализовано, частично) |
+| `JournalService` | Журнал сделок при исполнении ордеров |
 | `AnalyticsService` | Без побочных эффектов; приём баров там, где экономит сетевые раунды |
 | `TradingBotService` | Registry стратегий, контекст, аудит |
 | `TradingTerminalService` | Paper-режим, идempotency-ключ создания ордера (по мере нужды) |
@@ -575,7 +577,7 @@ StrategySignal включает:
 flowchart LR
   subgraph ingestion
     B[BrokerIntegrationService]
-    M[MarketData or PriceService]
+    M[MarketHistoryService]
     B -->|historical pull| M
   end
 
@@ -585,8 +587,10 @@ flowchart LR
 
   subgraph execution
     T[TradingTerminalService]
+    J[JournalService]
     K[BrokerIntegrationService orders]
     T --> K
+    T --> J
   end
 
   subgraph bots
@@ -594,9 +598,9 @@ flowchart LR
   end
 
   subgraph offline
-    S[BacktestService]
-    O[OptimizerService]
-    O -->|jobs| S
+  S[BotOptimizationService backtest]
+  O[BotOptimizationService optimizer]
+  O -->|grid jobs| S
   end
 
   M --> R
@@ -622,4 +626,4 @@ flowchart LR
 
 ---
 
-*Версия документа: 1.1. Проект: FinancialSystem. Ориентир по функциональности: OsEngine (Data, Optimizer, Tester, Bot Station, слой роботов). Архитектурное сопоставление: раздел [1.3](#section-1-3).*
+*Версия документа: 1.2. Проект: FinancialSystem. Ориентир по функциональности: OsEngine (Data, Optimizer, Tester, Bot Station, слой роботов). Архитектурное сопоставление: раздел [1.3](#section-1-3). Фазы A/C/D — частично выполнено (`MarketHistoryService`, `BotOptimizationService`).*

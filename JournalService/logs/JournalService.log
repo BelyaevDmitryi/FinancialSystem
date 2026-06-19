@@ -1,0 +1,34 @@
+2026-06-19T04:07:55.615+03:00  INFO 83444 --- [journal-service] [main] c.fs.controller.JournalControllerTest    : Starting JournalControllerTest using Java 25.0.2 with PID 83444 (started by belyaev.dmitryi in /Users/belyaev.dmitryi/CursorProjects/FinancialSystem/JournalService)
+2026-06-19T04:07:55.618+03:00 DEBUG 83444 --- [journal-service] [main] c.fs.controller.JournalControllerTest    : Running with Spring Boot v3.4.1, Spring v6.2.1
+2026-06-19T04:07:55.618+03:00  INFO 83444 --- [journal-service] [main] c.fs.controller.JournalControllerTest    : The following 1 profile is active: "test"
+2026-06-19T04:07:56.300+03:00  WARN 83444 --- [journal-service] [main] .s.s.UserDetailsServiceAutoConfiguration : 
+
+Using generated security password: 31aaf743-968a-4ef6-90db-0ecc4c99f755
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-06-19T04:07:56.307+03:00  INFO 83444 --- [journal-service] [main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2026-06-19T04:07:56.551+03:00  INFO 83444 --- [journal-service] [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-06-19T04:07:56.552+03:00  INFO 83444 --- [journal-service] [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-06-19T04:07:56.552+03:00  INFO 83444 --- [journal-service] [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-06-19T04:07:56.562+03:00  INFO 83444 --- [journal-service] [main] c.fs.controller.JournalControllerTest    : Started JournalControllerTest in 1.103 seconds (process running for 1.54)
+2026-06-19T04:07:56.691+03:00  INFO 83444 --- [journal-service] [main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.fs.controller.JournalControllerTest$GetPositions]: GetPositions does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-06-19T04:07:56.694+03:00  INFO 83444 --- [journal-service] [main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.fs.JournalServiceApplication for test class com.fs.controller.JournalControllerTest$GetPositions
+2026-06-19T04:07:56.712+03:00  WARN 83444 --- [journal-service] [main] .w.s.m.s.DefaultHandlerExceptionResolver : Resolved [org.springframework.web.bind.MissingRequestHeaderException: Required request header 'X-User-Id' for method parameter type Long is not present]
+2026-06-19T04:19:37.416+03:00  INFO 95832 --- [journal-service] [main] c.fs.controller.JournalControllerTest    : Starting JournalControllerTest using Java 25.0.2 with PID 95832 (started by belyaev.dmitryi in /Users/belyaev.dmitryi/CursorProjects/FinancialSystem/JournalService)
+2026-06-19T04:19:37.416+03:00 DEBUG 95832 --- [journal-service] [main] c.fs.controller.JournalControllerTest    : Running with Spring Boot v3.4.1, Spring v6.2.1
+2026-06-19T04:19:37.417+03:00  INFO 95832 --- [journal-service] [main] c.fs.controller.JournalControllerTest    : The following 1 profile is active: "test"
+2026-06-19T04:19:38.107+03:00  WARN 95832 --- [journal-service] [main] .s.s.UserDetailsServiceAutoConfiguration : 
+
+Using generated security password: d7e796ff-6c22-4e85-bbeb-86ff26c171d1
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-06-19T04:19:38.115+03:00  INFO 95832 --- [journal-service] [main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2026-06-19T04:19:38.378+03:00  INFO 95832 --- [journal-service] [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-06-19T04:19:38.379+03:00  INFO 95832 --- [journal-service] [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-06-19T04:19:38.379+03:00  INFO 95832 --- [journal-service] [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-06-19T04:19:38.391+03:00  INFO 95832 --- [journal-service] [main] c.fs.controller.JournalControllerTest    : Started JournalControllerTest in 1.125 seconds (process running for 1.574)
+2026-06-19T04:19:38.526+03:00  INFO 95832 --- [journal-service] [main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.fs.controller.JournalControllerTest$GetPositions]: GetPositions does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-06-19T04:19:38.530+03:00  INFO 95832 --- [journal-service] [main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.fs.JournalServiceApplication for test class com.fs.controller.JournalControllerTest$GetPositions
+2026-06-19T04:19:38.549+03:00  WARN 95832 --- [journal-service] [main] .w.s.m.s.DefaultHandlerExceptionResolver : Resolved [org.springframework.web.bind.MissingRequestHeaderException: Required request header 'X-User-Id' for method parameter type Long is not present]

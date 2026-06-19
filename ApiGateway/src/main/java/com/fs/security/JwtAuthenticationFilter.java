@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -20,6 +22,13 @@ import java.util.List;
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+
+    /**
+     * Сырой access JWT для внутренних вызовов: при проксировании через Gateway заголовок
+     * {@code Authorization} до микросервисов иногда не доходит, а кастомный заголовок передаётся.
+     * Клиентский запрос очищаем от подделки перед подстановкой проверенного токена.
+     */
+    public static final String GATEWAY_INTERNAL_JWT_HEADER = "X-Gateway-Internal-Jwt";
 
     @Autowired
     private JwtUtils jwtUtils;
@@ -37,6 +46,11 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
+
+        // CORS preflight не содержит Authorization — не требуем JWT, иначе браузер блокирует цепочку после логина.
+        if (request.getMethod() == HttpMethod.OPTIONS) {
+            return chain.filter(exchange);
+        }
 
         // Пропускаем публичные пути
         if (isPublicPath(path)) {
@@ -59,14 +73,19 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             String userId = jwtUtils.extractUserId(token);
             List<String> roles = jwtUtils.extractRoles(token);
             
-            // Добавляем userId и роли в заголовки для передачи в микросервисы
-            ServerHttpRequest.Builder requestBuilder = request.mutate()
-                    .header("X-User-Id", userId);
-            
+            // Добавляем userId, роли и внутренний JWT для микросервисов (см. GATEWAY_INTERNAL_JWT_HEADER).
+            ServerHttpRequest.Builder requestBuilder = request.mutate();
+            requestBuilder.headers(headers -> headers.remove(GATEWAY_INTERNAL_JWT_HEADER));
+            requestBuilder.header("X-User-Id", userId);
+
             // Добавляем роли в заголовок как строку через запятую
             if (!roles.isEmpty()) {
                 requestBuilder.header("X-User-Roles", String.join(",", roles));
             }
+
+            // Повторно выставляем Authorization после проверки: до сервисов клиентский Bearer иногда теряется при прокси.
+            requestBuilder.header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+            requestBuilder.header(GATEWAY_INTERNAL_JWT_HEADER, token);
 
             ServerHttpRequest modifiedRequest = requestBuilder.build();
 

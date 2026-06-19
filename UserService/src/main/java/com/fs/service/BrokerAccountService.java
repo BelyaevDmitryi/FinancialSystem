@@ -31,6 +31,7 @@ public class BrokerAccountService {
     private final AccountRepository accountRepository;
     private final BrokerRepository brokerRepository;
     private final UserRepository userRepository;
+    private final TinkoffBrokerAccountsDiscovery tinkoffBrokerAccountsDiscovery;
 
     @Transactional(readOnly = true)
     public List<BrokerDto> getAllBrokers() {
@@ -71,6 +72,21 @@ public class BrokerAccountService {
                     "Счёт по умолчанию для брокера " + brokerCode + " не выбран. Выберите счёт в профиле.");
         }
         return new DefaultBrokerAccountDto(defaultAccount.getExternalAccountId());
+    }
+
+    /**
+     * Список счетов у брокера по временному API-токену (токен только для этого запроса).
+     */
+    @Transactional(readOnly = true)
+    public List<DiscoveredBrokerAccountDto> discoverAccounts(DiscoverBrokerAccountsRequestDto dto) {
+        Broker broker = brokerRepository.findByCode(dto.getBrokerCode().trim())
+                .orElseThrow(() -> new IllegalArgumentException("Брокер с кодом " + dto.getBrokerCode() + " не найден"));
+        if ("TINKOFF".equalsIgnoreCase(broker.getCode())) {
+            return tinkoffBrokerAccountsDiscovery.discover(dto.getApiToken(), dto.isSandbox());
+        }
+        throw new IllegalArgumentException(
+                "Загрузка счетов по токену пока поддерживается только для TINKOFF (Т-Инвестиции). "
+                        + "Для других брокеров укажите идентификатор счёта в поле ниже.");
     }
 
     @Transactional
@@ -125,6 +141,45 @@ public class BrokerAccountService {
         if (!uba.getUserBroker().getUser().getId().equals(userIdLong)) {
             throw new BrokerAccountNotFoundException("Счёт не принадлежит пользователю");
         }
+        return applyAccountUpdate(uba, dto);
+    }
+
+    @Transactional
+    public UserBrokerAccountDto updateAccountByExternalIds(
+            String userId,
+            String brokerCode,
+            String externalAccountId,
+            UpdateUserBrokerAccountDto dto) {
+        Long userIdLong = parseUserId(userId);
+        UserBrokerAccount uba = userBrokerAccountRepository
+                .findByUserBroker_User_IdAndUserBroker_Broker_CodeAndAccount_ExternalAccountId(
+                        userIdLong, brokerCode.trim(), externalAccountId.trim())
+                .orElseThrow(() -> new BrokerAccountNotFoundException("Счёт не найден"));
+        return applyAccountUpdate(uba, dto);
+    }
+
+    @Transactional
+    public void deleteAccount(String userId, Long userBrokerAccountId) {
+        Long userIdLong = parseUserId(userId);
+        UserBrokerAccount uba = userBrokerAccountRepository.findById(userBrokerAccountId)
+                .orElseThrow(() -> new BrokerAccountNotFoundException("Счёт не найден"));
+        if (!uba.getUserBroker().getUser().getId().equals(userIdLong)) {
+            throw new BrokerAccountNotFoundException("Счёт не принадлежит пользователю");
+        }
+        deleteUserBrokerAccount(uba);
+    }
+
+    @Transactional
+    public void deleteAccountByExternalIds(String userId, String brokerCode, String externalAccountId) {
+        Long userIdLong = parseUserId(userId);
+        UserBrokerAccount uba = userBrokerAccountRepository
+                .findByUserBroker_User_IdAndUserBroker_Broker_CodeAndAccount_ExternalAccountId(
+                        userIdLong, brokerCode.trim(), externalAccountId.trim())
+                .orElseThrow(() -> new BrokerAccountNotFoundException("Счёт не найден"));
+        deleteUserBrokerAccount(uba);
+    }
+
+    private UserBrokerAccountDto applyAccountUpdate(UserBrokerAccount uba, UpdateUserBrokerAccountDto dto) {
         UserBroker userBroker = uba.getUserBroker();
         Account account = uba.getAccount();
 
@@ -143,21 +198,17 @@ public class BrokerAccountService {
         return toUserBrokerAccountDto(userBroker, uba);
     }
 
-    @Transactional
-    public void deleteAccount(String userId, Long userBrokerAccountId) {
-        Long userIdLong = parseUserId(userId);
-        UserBrokerAccount uba = userBrokerAccountRepository.findById(userBrokerAccountId)
-                .orElseThrow(() -> new BrokerAccountNotFoundException("Счёт не найден"));
-        if (!uba.getUserBroker().getUser().getId().equals(userIdLong)) {
-            throw new BrokerAccountNotFoundException("Счёт не принадлежит пользователю");
-        }
+    private void deleteUserBrokerAccount(UserBrokerAccount uba) {
+        Long userBrokerAccountId = uba.getId();
         UserBroker userBroker = uba.getUserBroker();
         if (userBroker.getDefaultAccount() != null && userBroker.getDefaultAccount().getId().equals(uba.getAccount().getId())) {
             userBroker.setDefaultAccount(null);
             userBrokerRepository.save(userBroker);
         }
         userBrokerAccountRepository.delete(uba);
-        log.info("Отвязан счёт {} для пользователя {}", userBrokerAccountId, userId);
+        User user = userBroker.getUser();
+        log.info("Отвязан счёт userBrokerAccount id={} у пользователя id={}",
+                userBrokerAccountId, user != null ? user.getId() : null);
     }
 
     private BrokerDto toBrokerDto(Broker broker) {

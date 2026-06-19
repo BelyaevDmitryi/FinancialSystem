@@ -7,6 +7,9 @@ spring:
   cloud:
     loadbalancer:
       enabled: true
+    openfeign:
+      okhttp:
+        enabled: true
   datasource:
     url: jdbc:postgresql://${SPRING_DATASOURCE_HOST:localhost}:${SPRING_DATASOURCE_PORT:5432}/${SPRING_DATASOURCE_DATABASE:tradingdb}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
@@ -76,3 +79,5 @@ broker:
   default-account-id: ${BROKER_ACCOUNT_ID:}
   integration:
     enabled: ${BROKER_INTEGRATION_ENABLED:true}
+  order-sync:
+    fixed-delay-ms: ${BROKER_ORDER_SYNC_DELAY_MS:5000}

@@ -1,5 +1,6 @@
 package com.fs.controller;
 
+import com.fs.dto.AmendBrokerOrderDto;
 import com.fs.dto.BrokerOrderDto;
 import com.fs.dto.CreateBrokerOrderDto;
 import com.fs.dto.FigiesDto;
@@ -144,6 +145,22 @@ public class StockController {
         return ResponseEntity.status(HttpStatus.CREATED).body(order);
     }
     
+    @PatchMapping("/orders/{orderId}")
+    @Operation(summary = "Изменить параметры заявки на бирже")
+    public ResponseEntity<BrokerOrderDto> amendOrder(
+            @RequestHeader("X-Account-Id") String accountId,
+            @PathVariable String orderId,
+            @Valid @RequestBody AmendBrokerOrderDto amendDto,
+            @Parameter(description = "Название брокера")
+            @RequestParam(required = false) String broker) {
+        log.info("Amending order {} for account {} on broker {}", orderId, accountId,
+                broker != null ? broker : "default");
+        BrokerOrderDto order = broker != null
+                ? brokerIntegrationService.amendOrder(accountId, orderId, amendDto, broker)
+                : brokerIntegrationService.amendOrder(accountId, orderId, amendDto);
+        return ResponseEntity.ok(order);
+    }
+
     @PostMapping("/orders/{orderId}/cancel")
     @Operation(summary = "Отменить заявку на бирже")
     public ResponseEntity<Void> cancelOrder(

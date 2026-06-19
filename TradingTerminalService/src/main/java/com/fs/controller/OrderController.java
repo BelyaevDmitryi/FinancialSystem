@@ -1,6 +1,7 @@
 package com.fs.controller;
 
 import com.fs.domain.OrderStatus;
+import com.fs.dto.AmendOrderDto;
 import com.fs.dto.CreateOrderDto;
 import com.fs.dto.OrderDto;
 import com.fs.service.OrderService;
@@ -69,6 +70,17 @@ public class OrderController {
             @PathVariable String orderId) {
         log.info("Исполнение ордера {} для пользователя: {}", orderId, userId);
         OrderDto order = orderService.executeOrder(orderId, userId);
+        return ResponseEntity.ok(order);
+    }
+
+    @PatchMapping("/{orderId}")
+    @Operation(summary = "Изменить параметры ордера (только свой, LIMIT PENDING)")
+    public ResponseEntity<OrderDto> amendOrder(
+            @RequestHeader("X-User-Id") String userId,
+            @PathVariable String orderId,
+            @Valid @RequestBody AmendOrderDto amendOrderDto) {
+        log.info("Изменение ордера {} для пользователя: {}", orderId, userId);
+        OrderDto order = orderService.amendOrder(orderId, userId, amendOrderDto);
         return ResponseEntity.ok(order);
     }
 

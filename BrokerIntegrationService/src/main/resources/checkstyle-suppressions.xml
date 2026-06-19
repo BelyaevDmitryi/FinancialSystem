@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+    "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+    "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+<suppressions>
+    <!-- TinkoffBrokerAdapter: complex methods interacting with Tinkoff gRPC API -->
+    <suppress files="TinkoffBrokerAdapter.java"
+              checks="MethodLength|JavaNCSS|NPathComplexity|DeclarationOrder|EmptyLineSeparator"/>
+
+    <!-- MockBrokerAdapter: in-memory order book simulation for tests -->
+    <suppress files="MockBrokerAdapter.java"
+              checks="MethodLength|EmptyLineSeparator|ParameterNumber"/>
+
+    <!-- Lombok @Value generates package-private final fields; not a real visibility issue -->
+    <suppress files="Stock.java|StockPrice.java|StocksDto.java|StocksPricesDto.java"
+              checks="VisibilityModifier|EmptyLineSeparator"/>
+
+    <!-- Pre-existing DTO field spacing -->
+    <suppress files="BrokerCandleDto.java|HistoricCandlesDto.java"
+              checks="EmptyLineSeparator|ParameterNumber"/>
+
+    <!-- Pre-existing factory field spacing -->
+    <suppress files="BrokerFactory.java"
+              checks="EmptyLineSeparator"/>
+
+    <!-- StockController: pre-existing wildcard import and long lines -->
+    <suppress files="StockController.java"
+              checks="AvoidStarImport|LineLength"/>
+
+    <!-- StockPriceMapper: pre-existing long lines -->
+    <suppress files="StockPriceMapper.java"
+              checks="LineLength"/>
+
+    <!-- ApplicationConfig: bean method name matches class name (Tinkoff SDK convention) -->
+    <suppress files="ApplicationConfig.java"
+              checks="MethodName"/>
+</suppressions>

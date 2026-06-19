@@ -23,10 +23,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
+    private static final String GATEWAY_INTERNAL_JWT_HEADER = "X-Gateway-Internal-Jwt";
+
     private final JwtUtils jwtUtils;
 
     public JwtAuthenticationFilter(JwtUtils jwtUtils) {
         this.jwtUtils = jwtUtils;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.startsWith("/actuator/") || path.startsWith("/api-docs") || path.startsWith("/swagger-ui");
     }
 
     @Override
@@ -72,9 +80,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private String parseJwt(HttpServletRequest request) {
+        String internal = request.getHeader(GATEWAY_INTERNAL_JWT_HEADER);
+        if (StringUtils.hasText(internal)) {
+            return internal.trim();
+        }
         String headerAuth = request.getHeader("Authorization");
         if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
-            return headerAuth.substring(7);
+            return headerAuth.substring(7).trim();
         }
         return null;
     }

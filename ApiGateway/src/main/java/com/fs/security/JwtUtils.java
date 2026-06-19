@@ -19,6 +19,9 @@ public class JwtUtils {
     @Value("${jwt.secret}")
     private String secret;
 
+    private static final String CLAIM_TYPE = "type";
+    private static final String TYPE_REFRESH = "refresh";
+
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
@@ -59,13 +62,18 @@ public class JwtUtils {
                 .getPayload();
     }
 
-    public Boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
-    }
-
+    /**
+     * Проверка access-токена для маршрутизации: подпись, срок, тип не {@code refresh}.
+     * Токены без claim {@code type} считаем access (совместимость со старыми выпусками).
+     */
     public Boolean validateToken(String token) {
         try {
-            return !isTokenExpired(token);
+            Claims claims = extractAllClaims(token);
+            Object type = claims.get(CLAIM_TYPE);
+            if (TYPE_REFRESH.equals(type)) {
+                return false;
+            }
+            return claims.getExpiration().after(new Date());
         } catch (Exception e) {
             return false;
         }

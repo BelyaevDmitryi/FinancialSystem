@@ -15,6 +15,9 @@ public interface UserBrokerAccountRepository extends JpaRepository<UserBrokerAcc
 
     Optional<UserBrokerAccount> findByUserBrokerIdAndAccountId(Long userBrokerId, Long accountId);
 
+    Optional<UserBrokerAccount> findByUserBroker_User_IdAndUserBroker_Broker_CodeAndAccount_ExternalAccountId(
+            Long userId, String brokerCode, String externalAccountId);
+
     boolean existsByUserBrokerIdAndAccountId(Long userBrokerId, Long accountId);
 
     @Modifying

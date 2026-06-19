@@ -86,6 +86,14 @@ spring:
           filters:
             - StripPrefix=1
 
+        # Journal Service routes
+        - id: journal-service
+          uri: lb://journal-service
+          predicates:
+            - Path=/api/journal/**
+          filters:
+            - StripPrefix=1
+
         # Trading Bot Service routes
         - id: trading-bot-service
           uri: lb://trading-bot-service
@@ -107,6 +115,14 @@ spring:
           uri: lb://bot-optimization-service
           predicates:
             - Path=/api/bot-optimization/**
+          filters:
+            - StripPrefix=1
+
+        # Backtest (BotOptimizationService package com.fs.backtest)
+        - id: backtest-service
+          uri: lb://bot-optimization-service
+          predicates:
+            - Path=/api/backtest/**
           filters:
             - StripPrefix=1
 

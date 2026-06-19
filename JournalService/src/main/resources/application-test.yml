@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: jdbc:tc:postgresql:15-alpine:///journaldb
+    username: postgres
+    password: postgres
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+
+jwt:
+  secret: 5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437
+
+logging:
+  level:
+    com.fs: DEBUG

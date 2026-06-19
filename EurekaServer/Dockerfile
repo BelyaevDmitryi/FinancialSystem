@@ -11,6 +11,7 @@ RUN mvn clean package -DskipTests
 RUN echo "=== Contents of /app/target/ ===" && ls -la /app/target/
 
 FROM bellsoft/liberica-openjdk-alpine-musl:17
+RUN apk add --no-cache curl
 WORKDIR /app
 #RUN ls -la /app/target/
 COPY --from=build /app/target/*.jar app.jar

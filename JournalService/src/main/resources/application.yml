@@ -1,0 +1,71 @@
+server:
+  port: 8012
+
+spring:
+  application:
+    name: journal-service
+  cloud:
+    loadbalancer:
+      enabled: true
+  datasource:
+    url: jdbc:postgresql://${SPRING_DATASOURCE_HOST:localhost}:${SPRING_DATASOURCE_PORT:5432}/${SPRING_DATASOURCE_DATABASE:journaldb}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+logging:
+  level:
+    root: INFO
+  file:
+    name: logs/JournalService.log
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+    healthcheck:
+      enabled: true
+  instance:
+    prefer-ip-address: false
+    hostname: journal-service
+    status-page-url: http://journal-service:8012/actuator/info
+    health-check-url: http://journal-service:8012/actuator/health
+    home-page-url: http://journal-service:8012/
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+  info:
+    env:
+      enabled: true
+    app:
+      name: ${spring.application.name}
+      description: Trade journal and positions service for Financial System
+
+springdoc:
+  api-docs:
+    path: /api-docs
+
+jwt:
+  secret: ${JWT_SECRET:5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437}

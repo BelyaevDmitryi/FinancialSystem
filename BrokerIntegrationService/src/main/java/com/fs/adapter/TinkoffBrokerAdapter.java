@@ -1,5 +1,6 @@
 package com.fs.adapter;
 
+import com.fs.dto.AmendBrokerOrderDto;
 import com.fs.dto.BrokerCandleDto;
 import com.fs.dto.BrokerOrderDto;
 import com.fs.dto.CreateBrokerOrderDto;
@@ -16,6 +17,7 @@ import com.fs.model.Currency;
 import com.fs.model.Stock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import ru.tinkoff.piapi.contract.v1.CandleInterval;
 import ru.tinkoff.piapi.contract.v1.GetOrderBookResponse;
@@ -28,6 +30,10 @@ import ru.tinkoff.piapi.contract.v1.MoneyValue;
 import ru.tinkoff.piapi.contract.v1.Quotation;
 import ru.tinkoff.piapi.contract.v1.Share;
 import ru.tinkoff.piapi.contract.v1.OrderState;
+import ru.tinkoff.piapi.contract.v1.PriceType;
+import ru.tinkoff.piapi.contract.v1.StopOrder;
+import ru.tinkoff.piapi.contract.v1.StopOrderDirection;
+import ru.tinkoff.piapi.contract.v1.StopOrderType;
 import ru.tinkoff.piapi.core.InvestApi;
 import ru.tinkoff.piapi.core.utils.MapperUtils;
 
@@ -37,20 +43,26 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
  * Адаптер для работы с Tinkoff Invest API
  */
 @Component("tinkoffBrokerAdapter")
+@Profile("!test & !mock-broker")
 @RequiredArgsConstructor
 @Slf4j
 public class TinkoffBrokerAdapter implements BrokerAdapter {
     
     private final InvestApi investApi;
     private final StockPriceMapper stockPriceMapper;
+
+    /** ID стоп-заявок, выставленных через этот адаптер (для cancel/getStatus). */
+    private final Set<String> stopOrderIds = ConcurrentHashMap.newKeySet();
     
     private static final String BROKER_NAME = "TINKOFF";
     private static final int INSTRUMENT_KIND_SHARE = 2;
@@ -271,8 +283,10 @@ public class TinkoffBrokerAdapter implements BrokerAdapter {
     @Override
     public boolean isAvailable() {
         try {
-            // Простая проверка доступности API через получение расписания торгов
-            investApi.getInstrumentsService().getTradingSchedules(Instant.now(), null).join();
+            Instant now = Instant.now();
+            investApi.getInstrumentsService()
+                    .getTradingSchedule("MOEX", now, now.plusSeconds(86_400))
+                    .join();
             return true;
         } catch (Exception e) {
             log.warn("Tinkoff API is not available: {}", e.getMessage());
@@ -350,6 +364,10 @@ public class TinkoffBrokerAdapter implements BrokerAdapter {
         log.info("Placing order on Tinkoff: accountId={}, figi={}, direction={}, quantity={}, price={}", 
                 accountId, createOrderDto.getFigi(), createOrderDto.getDirection(), 
                 createOrderDto.getQuantity(), createOrderDto.getPrice());
+
+        if ("STOP".equalsIgnoreCase(createOrderDto.getOrderType())) {
+            return placeStopOrder(accountId, createOrderDto);
+        }
         
         try {
             var ordersService = investApi.getOrdersService();
@@ -359,10 +377,7 @@ public class TinkoffBrokerAdapter implements BrokerAdapter {
                     ? OrderDirection.ORDER_DIRECTION_BUY 
                     : OrderDirection.ORDER_DIRECTION_SELL;
             
-            // Преобразуем тип заявки
-            OrderType orderType = "MARKET".equalsIgnoreCase(createOrderDto.getOrderType())
-                    ? OrderType.ORDER_TYPE_MARKET
-                    : OrderType.ORDER_TYPE_LIMIT;
+            OrderType orderType = resolveExchangeOrderType(createOrderDto.getOrderType());
             
             // Преобразуем цену в Quotation (если указана)
             Quotation price = null;
@@ -417,32 +432,156 @@ public class TinkoffBrokerAdapter implements BrokerAdapter {
     }
 
     @Override
+    public BrokerOrderDto amendOrder(String accountId, String orderId, AmendBrokerOrderDto amendDto) {
+        if (stopOrderIds.contains(orderId)) {
+            throw new UnsupportedOperationException("Изменение стоп-заявок не поддерживается");
+        }
+        log.info("Amending order on Tinkoff: accountId={}, orderId={}", accountId, orderId);
+
+        try {
+            OrderState current = investApi.getOrdersService().getOrderState(accountId, orderId).join();
+            if (current.getOrderType() != OrderType.ORDER_TYPE_LIMIT) {
+                throw new IllegalStateException("Изменение поддерживается только для LIMIT-заявок");
+            }
+
+            long quantity = amendDto.getQuantity() != null
+                    ? amendDto.getQuantity()
+                    : current.getLotsRequested();
+            BigDecimal priceDecimal = resolveAmendPrice(current, amendDto);
+            Quotation price = MapperUtils.bigDecimalToQuotation(priceDecimal);
+            String idempotencyKey = UUID.randomUUID().toString();
+
+            investApi.getOrdersService().replaceOrder(
+                    orderId,
+                    quantity,
+                    price,
+                    accountId,
+                    idempotencyKey,
+                    PriceType.PRICE_TYPE_CURRENCY
+            ).join();
+
+            return getOrderStatus(accountId, orderId);
+        } catch (IllegalStateException | IllegalArgumentException | UnsupportedOperationException ex) {
+            throw ex;
+        } catch (Exception e) {
+            log.error("Error amending order on Tinkoff: {}", e.getMessage(), e);
+            throw new RuntimeException("Не удалось изменить заявку: " + e.getMessage(), e);
+        }
+    }
+
+    private BigDecimal resolveAmendPrice(OrderState current, AmendBrokerOrderDto amendDto) {
+        if (amendDto.getPrice() != null) {
+            return amendDto.getPrice();
+        }
+        if (current.hasInitialSecurityPrice()) {
+            return convertMoneyValueToBigDecimal(current.getInitialSecurityPrice());
+        }
+        throw new IllegalArgumentException("Цена обязательна для изменения лимитной заявки");
+    }
+
+    @Override
     public void cancelOrder(String accountId, String orderId) {
         log.info("Cancelling order on Tinkoff: accountId={}, orderId={}", accountId, orderId);
-        
+
+        if (stopOrderIds.contains(orderId)) {
+            cancelStopOrderOnTinkoff(accountId, orderId);
+            return;
+        }
+
         try {
             var ordersService = investApi.getOrdersService();
             ordersService.cancelOrder(accountId, orderId).join();
-            log.info("Order cancelled successfully: orderId={}", orderId);
-        } catch (Exception e) {
-            log.error("Error cancelling order on Tinkoff: {}", e.getMessage(), e);
-            throw new RuntimeException("Не удалось отменить заявку: " + e.getMessage(), e);
+            log.info("Exchange order cancelled successfully: orderId={}", orderId);
+        } catch (Exception exchangeError) {
+            log.debug("Exchange cancel failed for orderId={}, trying stop order API: {}",
+                    orderId, exchangeError.getMessage());
+            try {
+                cancelStopOrderOnTinkoff(accountId, orderId);
+            } catch (Exception stopError) {
+                log.error("Error cancelling order on Tinkoff: {}", stopError.getMessage(), stopError);
+                throw new RuntimeException("Не удалось отменить заявку: " + stopError.getMessage(), stopError);
+            }
         }
+    }
+
+    private void cancelStopOrderOnTinkoff(String accountId, String stopOrderId) {
+        investApi.getStopOrdersService().cancelStopOrder(accountId, stopOrderId).join();
+        stopOrderIds.remove(stopOrderId);
+        log.info("Stop order cancelled successfully: orderId={}", stopOrderId);
     }
 
     @Override
     public BrokerOrderDto getOrderStatus(String accountId, String orderId) {
         log.debug("Getting order status from Tinkoff: accountId={}, orderId={}", accountId, orderId);
-        
+
+        if (stopOrderIds.contains(orderId)) {
+            return getStopOrderStatus(accountId, orderId);
+        }
+
         try {
             var ordersService = investApi.getOrdersService();
             var orderState = ordersService.getOrderState(accountId, orderId).join();
-            
             return convertOrderStateToDto(orderState);
-        } catch (Exception e) {
-            log.error("Error getting order status from Tinkoff: {}", e.getMessage(), e);
-            throw new RuntimeException("Не удалось получить статус заявки: " + e.getMessage(), e);
+        } catch (Exception exchangeError) {
+            log.debug("Exchange order state unavailable for orderId={}, trying stop orders: {}",
+                    orderId, exchangeError.getMessage());
+            return getStopOrderStatus(accountId, orderId);
         }
+    }
+
+    private BrokerOrderDto getStopOrderStatus(String accountId, String stopOrderId) {
+        try {
+            var stopOrders = investApi.getStopOrdersService().getStopOrders(accountId).join();
+            return stopOrders.stream()
+                    .filter(stop -> stopOrderId.equals(stop.getStopOrderId()))
+                    .findFirst()
+                    .map(this::convertStopOrderToDto)
+                    .orElseGet(() -> buildCancelledStopOrderDto(stopOrderId));
+        } catch (Exception e) {
+            log.error("Error getting stop order status from Tinkoff: {}", e.getMessage(), e);
+            throw new RuntimeException("Не удалось получить статус стоп-заявки: " + e.getMessage(), e);
+        }
+    }
+
+    private BrokerOrderDto buildCancelledStopOrderDto(String stopOrderId) {
+        BrokerOrderDto dto = new BrokerOrderDto();
+        dto.setOrderId(stopOrderId);
+        dto.setOrderType("STOP");
+        dto.setStatus("CANCELLED");
+        dto.setCreatedAt(Instant.now());
+        dto.setMessage("Стоп-заявка отменена или исполнена");
+        return dto;
+    }
+
+    private BrokerOrderDto convertStopOrderToDto(StopOrder stopOrder) {
+        BrokerOrderDto dto = new BrokerOrderDto();
+        dto.setOrderId(stopOrder.getStopOrderId());
+        dto.setFigi(stopOrder.getFigi());
+        dto.setQuantity(stopOrder.getLotsRequested());
+        dto.setExecutedQuantity(0L);
+        if (stopOrder.hasPrice()) {
+            dto.setPrice(convertMoneyValueToBigDecimal(stopOrder.getPrice()));
+        }
+        dto.setDirection(convertStopOrderDirection(stopOrder.getDirection()));
+        dto.setOrderType("STOP");
+        // getStopOrders возвращает только активные стоп-заявки (SDK 1.5 без поля status).
+        dto.setStatus("NEW");
+        if (stopOrder.hasCreateDate()) {
+            var createDate = stopOrder.getCreateDate();
+            dto.setCreatedAt(Instant.ofEpochSecond(createDate.getSeconds(), createDate.getNanos()));
+        } else {
+            dto.setCreatedAt(Instant.now());
+        }
+        dto.setMessage("Стоп-заявка");
+        return dto;
+    }
+
+    private String convertStopOrderDirection(StopOrderDirection direction) {
+        return switch (direction) {
+            case STOP_ORDER_DIRECTION_BUY -> "BUY";
+            case STOP_ORDER_DIRECTION_SELL -> "SELL";
+            default -> direction.name();
+        };
     }
 
     @Override
@@ -489,6 +628,61 @@ public class TinkoffBrokerAdapter implements BrokerAdapter {
             log.error("Error loading historic candles for {}: {}", figi, e.getMessage(), e);
             throw new RuntimeException("Не удалось загрузить исторические свечи: " + e.getMessage(), e);
         }
+    }
+
+    private BrokerOrderDto placeStopOrder(String accountId, CreateBrokerOrderDto createOrderDto) {
+        if (createOrderDto.getStopPrice() == null) {
+            throw new IllegalArgumentException("stopPrice обязателен для стоп-заявки");
+        }
+        try {
+            StopOrderDirection direction = "BUY".equalsIgnoreCase(createOrderDto.getDirection())
+                    ? StopOrderDirection.STOP_ORDER_DIRECTION_BUY
+                    : StopOrderDirection.STOP_ORDER_DIRECTION_SELL;
+
+            Quotation stopPrice = MapperUtils.bigDecimalToQuotation(createOrderDto.getStopPrice());
+            Quotation price = createOrderDto.getPrice() != null
+                    ? MapperUtils.bigDecimalToQuotation(createOrderDto.getPrice())
+                    : stopPrice;
+
+            String stopOrderId = investApi.getStopOrdersService().postStopOrderGoodTillDate(
+                    createOrderDto.getFigi(),
+                    createOrderDto.getQuantity(),
+                    price,
+                    stopPrice,
+                    direction,
+                    accountId,
+                    StopOrderType.STOP_ORDER_TYPE_STOP_LOSS,
+                    Instant.now().plusSeconds(86_400)
+            ).join();
+
+            stopOrderIds.add(stopOrderId);
+
+            BrokerOrderDto orderDto = new BrokerOrderDto();
+            orderDto.setOrderId(stopOrderId);
+            orderDto.setFigi(createOrderDto.getFigi());
+            orderDto.setQuantity(createOrderDto.getQuantity());
+            orderDto.setExecutedQuantity(0L);
+            orderDto.setPrice(createOrderDto.getPrice());
+            orderDto.setDirection(createOrderDto.getDirection());
+            orderDto.setOrderType("STOP");
+            orderDto.setStatus("NEW");
+            orderDto.setCreatedAt(Instant.now());
+            orderDto.setMessage("Стоп-заявка создана");
+            return orderDto;
+        } catch (Exception e) {
+            log.error("Error placing stop order on Tinkoff: {}", e.getMessage(), e);
+            throw new RuntimeException("Не удалось выставить стоп-заявку: " + e.getMessage(), e);
+        }
+    }
+
+    private OrderType resolveExchangeOrderType(String orderType) {
+        if (orderType == null || orderType.isBlank() || "LIMIT".equalsIgnoreCase(orderType)) {
+            return OrderType.ORDER_TYPE_LIMIT;
+        }
+        if ("MARKET".equalsIgnoreCase(orderType)) {
+            return OrderType.ORDER_TYPE_MARKET;
+        }
+        throw new IllegalArgumentException("Неподдерживаемый тип заявки для биржевого API: " + orderType);
     }
 
     private CandleInterval resolveCandleInterval(String interval) {
@@ -589,6 +783,7 @@ public class TinkoffBrokerAdapter implements BrokerAdapter {
         return switch (orderType) {
             case ORDER_TYPE_MARKET -> "MARKET";
             case ORDER_TYPE_LIMIT -> "LIMIT";
+            case ORDER_TYPE_BESTPRICE -> "BESTPRICE";
             default -> orderType.name();
         };
     }

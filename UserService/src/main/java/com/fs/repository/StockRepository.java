@@ -13,5 +13,7 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
 
     List<Stock> findByTickerIn(List<String> tickers);
 
+    List<Stock> findByFigiIn(List<String> figis);
+
     void deleteByTicker(String ticker);
 }

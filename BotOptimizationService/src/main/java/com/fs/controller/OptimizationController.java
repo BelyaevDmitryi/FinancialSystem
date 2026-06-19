@@ -1,7 +1,10 @@
 package com.fs.controller;
 
+import com.fs.dto.GridOptimizationRequest;
+import com.fs.dto.GridOptimizationResponseDto;
 import com.fs.dto.OptimizationResultDto;
 import com.fs.dto.SmaGridOptimizationRequest;
+import com.fs.service.MultiParamOptimizationService;
 import com.fs.service.SmaTrendOptimizationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,9 +25,13 @@ public class OptimizationController {
     private static final Logger log = LoggerFactory.getLogger(OptimizationController.class);
 
     private final SmaTrendOptimizationService smaTrendOptimizationService;
+    private final MultiParamOptimizationService multiParamOptimizationService;
 
-    public OptimizationController(SmaTrendOptimizationService smaTrendOptimizationService) {
+    public OptimizationController(
+            SmaTrendOptimizationService smaTrendOptimizationService,
+            MultiParamOptimizationService multiParamOptimizationService) {
         this.smaTrendOptimizationService = smaTrendOptimizationService;
+        this.multiParamOptimizationService = multiParamOptimizationService;
     }
 
     @PostMapping("/sma-trend-grid")
@@ -33,5 +40,14 @@ public class OptimizationController {
             @Valid @RequestBody SmaGridOptimizationRequest request) {
         log.info("Оптимизация SMA по figi={} {}..{}", request.getFigi(), request.getFrom(), request.getTo());
         return ResponseEntity.ok(smaTrendOptimizationService.optimize(request));
+    }
+
+    @PostMapping("/grid")
+    @Operation(summary = "Многопараметрический grid: BacktestEngine in-process, фильтры и ранжирование")
+    public ResponseEntity<GridOptimizationResponseDto> optimizeGrid(
+            @Valid @RequestBody GridOptimizationRequest request) {
+        log.info("Grid-оптимизация figi={} {}..{} params={}",
+                request.getFigi(), request.getFrom(), request.getTo(), request.getParameters().size());
+        return ResponseEntity.ok(multiParamOptimizationService.optimize(request));
     }
 }

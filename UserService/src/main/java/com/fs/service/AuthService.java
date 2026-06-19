@@ -1,8 +1,10 @@
 package com.fs.service;
 
 import com.fs.domain.User;
+import com.fs.dto.JwtResponseDto;
 import com.fs.dto.LoginRequestDto;
 import com.fs.dto.SignupRequestDto;
+import com.fs.exception.InvalidRefreshTokenException;
 import com.fs.exception.UserAlreadyExistException;
 import com.fs.repository.UserRepository;
 import com.fs.security.UserDetailsServiceImpl;
@@ -123,18 +125,25 @@ public class AuthService {
     }
 
     /**
-     * Обмен refresh-токена на новую пару access + refresh. Для продакшена: продление сессии без повторного ввода пароля.
+     * Обмен refresh-токена на новую пару access + refresh (продление сессии без повторного ввода пароля).
+     * При каждом успешном вызове выдаётся новая пара; старый refresh остаётся валидным до истечения TTL (stateless JWT).
+     *
+     * @param refreshToken JWT с claim {@code type=refresh}
+     * @return только токены ({@link JwtResponseDto#tokensOnly})
+     * @throws InvalidRefreshTokenException если токен null, пустой, невалидный или истёкший
      */
-    public com.fs.dto.JwtResponseDto refreshTokens(String refreshToken) {
+    public JwtResponseDto refreshTokens(String refreshToken) {
         if (refreshToken == null || !jwtUtils.validateRefreshToken(refreshToken)) {
-            throw new com.fs.exception.InvalidRefreshTokenException("Невалидный или истёкший refresh token");
+            logger.warn("Refresh token rejected: invalid or expired");
+            throw new InvalidRefreshTokenException("Невалидный или истёкший refresh token");
         }
         String userId = jwtUtils.extractUserId(refreshToken);
         UserDetailsServiceImpl.UserPrincipal userPrincipal = (UserDetailsServiceImpl.UserPrincipal)
                 userDetailsService.loadUserById(Long.parseLong(userId));
         String newAccess = jwtUtils.generateToken(userPrincipal);
         String newRefresh = jwtUtils.generateRefreshToken(userPrincipal);
-        return com.fs.dto.JwtResponseDto.tokensOnly(newAccess, newRefresh, jwtUtils.getExpirationMs());
+        logger.info("Tokens refreshed for user id {}", userId);
+        return JwtResponseDto.tokensOnly(newAccess, newRefresh, jwtUtils.getExpirationMs());
     }
 
     public long getAccessTokenExpirationMs() {

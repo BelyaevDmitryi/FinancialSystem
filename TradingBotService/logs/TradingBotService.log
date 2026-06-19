@@ -1,0 +1,66 @@
+2026-06-19T04:07:49.705+03:00  INFO 83290 --- [trading-bot-service] [main] c.f.controller.TradingBotControllerTest  : Starting TradingBotControllerTest using Java 25.0.2 with PID 83290 (started by belyaev.dmitryi in /Users/belyaev.dmitryi/CursorProjects/FinancialSystem/TradingBotService)
+2026-06-19T04:07:49.708+03:00  INFO 83290 --- [trading-bot-service] [main] c.f.controller.TradingBotControllerTest  : No active profile set, falling back to 1 default profile: "default"
+2026-06-19T04:07:50.051+03:00  WARN 83290 --- [trading-bot-service] [main] .s.s.UserDetailsServiceAutoConfiguration : 
+
+Using generated security password: ee4ae474-80bd-444b-901b-c4e6350a9855
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-06-19T04:07:50.058+03:00  INFO 83290 --- [trading-bot-service] [main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2026-06-19T04:07:50.254+03:00  INFO 83290 --- [trading-bot-service] [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-06-19T04:07:50.255+03:00  INFO 83290 --- [trading-bot-service] [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-06-19T04:07:50.255+03:00  INFO 83290 --- [trading-bot-service] [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-06-19T04:07:50.265+03:00  INFO 83290 --- [trading-bot-service] [main] c.f.controller.TradingBotControllerTest  : Started TradingBotControllerTest in 0.711 seconds (process running for 1.738)
+2026-06-19T04:07:50.291+03:00  INFO 83290 --- [trading-bot-service] [main] com.fs.controller.TradingBotController   : Удаление бота 1 пользователем 42
+2026-06-19T04:07:50.306+03:00  INFO 83290 --- [trading-bot-service] [main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.fs.controller.TradingBotControllerTest$UpdateBotStatus]: UpdateBotStatus does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-06-19T04:07:50.309+03:00  INFO 83290 --- [trading-bot-service] [main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.fs.TradingBotServiceApplication for test class com.fs.controller.TradingBotControllerTest$UpdateBotStatus
+2026-06-19T04:07:50.314+03:00  INFO 83290 --- [trading-bot-service] [main] com.fs.controller.TradingBotController   : Изменение статуса бота 1 на PAUSED
+2026-06-19T04:07:50.346+03:00  INFO 83290 --- [trading-bot-service] [main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.fs.controller.TradingBotControllerTest$GetBots]: GetBots does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-06-19T04:07:50.348+03:00  INFO 83290 --- [trading-bot-service] [main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.fs.TradingBotServiceApplication for test class com.fs.controller.TradingBotControllerTest$GetBots
+2026-06-19T04:07:50.351+03:00  INFO 83290 --- [trading-bot-service] [main] com.fs.controller.TradingBotController   : Получение ботов для пользователя: 42
+2026-06-19T04:07:50.358+03:00  INFO 83290 --- [trading-bot-service] [main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.fs.controller.TradingBotControllerTest$CreateBot]: CreateBot does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-06-19T04:07:50.360+03:00  INFO 83290 --- [trading-bot-service] [main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.fs.TradingBotServiceApplication for test class com.fs.controller.TradingBotControllerTest$CreateBot
+2026-06-19T04:07:50.397+03:00  WARN 83290 --- [trading-bot-service] [main] com.fs.exception.ExceptionController     : Ошибка Bean Validation: figi: FIGI не может быть пустым
+2026-06-19T04:07:50.404+03:00  INFO 83290 --- [trading-bot-service] [main] com.fs.controller.TradingBotController   : Создание бота для пользователя: 42
+2026-06-19T04:07:50.486+03:00  INFO 83290 --- [trading-bot-service] [main] com.fs.service.BotStrategyExecutor       : Торговый сигнал: botId=1, strategy=SMA_CROSSOVER, figi=BBG004730N88, signal=BUY, candles.size=20
+2026-06-19T04:07:50.486+03:00  INFO 83290 --- [trading-bot-service] [main] com.fs.service.TradingBotService         : Бот 1 создал ордер BUY: 201
+2026-06-19T04:07:50.486+03:00  INFO 83290 --- [trading-bot-service] [main] com.fs.service.BotStrategyExecutor       : Торговый сигнал: botId=1, strategy=SMA_CROSSOVER, figi=BBG004730N88, signal=SELL, candles.size=20
+2026-06-19T04:07:50.486+03:00  INFO 83290 --- [trading-bot-service] [main] com.fs.service.TradingBotService         : Бот 1 создал ордер SELL: 202
+2026-06-19T04:07:50.503+03:00  INFO 83290 --- [trading-bot-service] [main] com.fs.service.TradingBotService         : Бот 1 создал ордер BUY: 101
+2026-06-19T04:07:50.505+03:00  INFO 83290 --- [trading-bot-service] [main] com.fs.service.TradingBotService         : Бот 1 создал ордер BUY: 101
+2026-06-19T04:07:50.509+03:00  INFO 83290 --- [trading-bot-service] [main] com.fs.service.TradingBotService         : Бот 1 создал ордер SELL: 102
+2026-06-19T04:07:50.512+03:00  INFO 83290 --- [trading-bot-service] [main] com.fs.service.TradingBotService         : Бот 1 создал ордер BUY: 101
+2026-06-19T04:07:50.515+03:00  WARN 83290 --- [trading-bot-service] [main] com.fs.service.TradingBotService         : Нет данных о ценах для FIGI: BBG004730N88
+2026-06-19T04:19:29.512+03:00  INFO 95645 --- [trading-bot-service] [main] c.f.controller.TradingBotControllerTest  : Starting TradingBotControllerTest using Java 25.0.2 with PID 95645 (started by belyaev.dmitryi in /Users/belyaev.dmitryi/CursorProjects/FinancialSystem/TradingBotService)
+2026-06-19T04:19:29.513+03:00  INFO 95645 --- [trading-bot-service] [main] c.f.controller.TradingBotControllerTest  : No active profile set, falling back to 1 default profile: "default"
+2026-06-19T04:19:29.826+03:00  WARN 95645 --- [trading-bot-service] [main] .s.s.UserDetailsServiceAutoConfiguration : 
+
+Using generated security password: 7e3c2dc6-b25d-4f72-9a7f-e59d49b2f3f1
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-06-19T04:19:29.834+03:00  INFO 95645 --- [trading-bot-service] [main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2026-06-19T04:19:30.029+03:00  INFO 95645 --- [trading-bot-service] [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-06-19T04:19:30.029+03:00  INFO 95645 --- [trading-bot-service] [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-06-19T04:19:30.029+03:00  INFO 95645 --- [trading-bot-service] [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-06-19T04:19:30.040+03:00  INFO 95645 --- [trading-bot-service] [main] c.f.controller.TradingBotControllerTest  : Started TradingBotControllerTest in 0.678 seconds (process running for 1.593)
+2026-06-19T04:19:30.069+03:00  INFO 95645 --- [trading-bot-service] [main] com.fs.controller.TradingBotController   : Удаление бота 1 пользователем 42
+2026-06-19T04:19:30.083+03:00  INFO 95645 --- [trading-bot-service] [main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.fs.controller.TradingBotControllerTest$UpdateBotStatus]: UpdateBotStatus does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-06-19T04:19:30.086+03:00  INFO 95645 --- [trading-bot-service] [main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.fs.TradingBotServiceApplication for test class com.fs.controller.TradingBotControllerTest$UpdateBotStatus
+2026-06-19T04:19:30.090+03:00  INFO 95645 --- [trading-bot-service] [main] com.fs.controller.TradingBotController   : Изменение статуса бота 1 на PAUSED
+2026-06-19T04:19:30.120+03:00  INFO 95645 --- [trading-bot-service] [main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.fs.controller.TradingBotControllerTest$GetBots]: GetBots does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-06-19T04:19:30.123+03:00  INFO 95645 --- [trading-bot-service] [main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.fs.TradingBotServiceApplication for test class com.fs.controller.TradingBotControllerTest$GetBots
+2026-06-19T04:19:30.126+03:00  INFO 95645 --- [trading-bot-service] [main] com.fs.controller.TradingBotController   : Получение ботов для пользователя: 42
+2026-06-19T04:19:30.132+03:00  INFO 95645 --- [trading-bot-service] [main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.fs.controller.TradingBotControllerTest$CreateBot]: CreateBot does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-06-19T04:19:30.134+03:00  INFO 95645 --- [trading-bot-service] [main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.fs.TradingBotServiceApplication for test class com.fs.controller.TradingBotControllerTest$CreateBot
+2026-06-19T04:19:30.168+03:00  WARN 95645 --- [trading-bot-service] [main] com.fs.exception.ExceptionController     : Ошибка Bean Validation: figi: FIGI не может быть пустым
+2026-06-19T04:19:30.175+03:00  INFO 95645 --- [trading-bot-service] [main] com.fs.controller.TradingBotController   : Создание бота для пользователя: 42
+2026-06-19T04:19:30.248+03:00  INFO 95645 --- [trading-bot-service] [main] com.fs.service.BotStrategyExecutor       : Торговый сигнал: botId=1, strategy=SMA_CROSSOVER, figi=BBG004730N88, signal=BUY, candles.size=20
+2026-06-19T04:19:30.249+03:00  INFO 95645 --- [trading-bot-service] [main] com.fs.service.TradingBotService         : Бот 1 создал ордер BUY: 201
+2026-06-19T04:19:30.249+03:00  INFO 95645 --- [trading-bot-service] [main] com.fs.service.BotStrategyExecutor       : Торговый сигнал: botId=1, strategy=SMA_CROSSOVER, figi=BBG004730N88, signal=SELL, candles.size=20
+2026-06-19T04:19:30.249+03:00  INFO 95645 --- [trading-bot-service] [main] com.fs.service.TradingBotService         : Бот 1 создал ордер SELL: 202
+2026-06-19T04:19:30.270+03:00  INFO 95645 --- [trading-bot-service] [main] com.fs.service.TradingBotService         : Бот 1 создал ордер BUY: 101
+2026-06-19T04:19:30.273+03:00  INFO 95645 --- [trading-bot-service] [main] com.fs.service.TradingBotService         : Бот 1 создал ордер BUY: 101
+2026-06-19T04:19:30.278+03:00  INFO 95645 --- [trading-bot-service] [main] com.fs.service.TradingBotService         : Бот 1 создал ордер SELL: 102
+2026-06-19T04:19:30.281+03:00  INFO 95645 --- [trading-bot-service] [main] com.fs.service.TradingBotService         : Бот 1 создал ордер BUY: 101
+2026-06-19T04:19:30.285+03:00  WARN 95645 --- [trading-bot-service] [main] com.fs.service.TradingBotService         : Нет данных о ценах для FIGI: BBG004730N88

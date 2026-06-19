@@ -10,6 +10,9 @@ import AnalyticsPage from './pages/AnalyticsPage'
 import BotsPage from './pages/BotsPage'
 import AdminPage from './pages/AdminPage'
 import ProfilePage from './pages/ProfilePage'
+import BacktestPage from './pages/BacktestPage'
+import OptimizerPage from './pages/OptimizerPage'
+import JournalPage from './pages/JournalPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
 
@@ -32,6 +35,9 @@ function App() {
           <Route path="trading" element={<TradingPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="bots" element={<BotsPage />} />
+          <Route path="backtest" element={<BacktestPage />} />
+          <Route path="optimizer" element={<OptimizerPage />} />
+          <Route path="journal" element={<JournalPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route 
             path="admin" 

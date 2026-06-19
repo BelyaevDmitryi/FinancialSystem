@@ -7,6 +7,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -23,6 +24,15 @@ public class ExceptionController extends ResponseEntityExceptionHandler {
     
     private static final Logger logger = LoggerFactory.getLogger(ExceptionController.class);
     
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorDto> handleConstraintViolation(ConstraintViolationException ex) {
+        String msg = ex.getConstraintViolations().stream()
+                .map(violation -> violation.getMessage())
+                .collect(Collectors.joining(", "));
+        logger.warn("Constraint violation: {}", msg);
+        return new ResponseEntity<>(new ErrorDto(msg), HttpStatus.BAD_REQUEST);
+    }
+
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException ex,

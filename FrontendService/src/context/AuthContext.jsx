@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react'
+import { flushSync } from 'react-dom'
 import api from '../services/api'
 
 const AuthContext = createContext(null)
@@ -38,15 +39,28 @@ export const AuthProvider = ({ children }) => {
         username,
         password,
       })
-      const { token: newToken, refreshToken: newRefreshToken, id, name, roles } = response.data
-      const userData = { id, name, username, roles: roles || [] }
-      
-      setToken(newToken)
-      setUser(userData)
+      const data = response.data || {}
+      const newToken = data.token ?? data.accessToken
+      const newRefreshToken = data.refreshToken
+      const { id, name, roles } = data
+      const userData = { id, name, username: data.username ?? username, roles: roles || [] }
+
+      if (!newToken) {
+        return {
+          success: false,
+          error: 'Ответ сервера не содержит access token',
+        }
+      }
+
+      // Сначала localStorage, затем синхронный flush контекста — иначе ProtectedRoute/дашборд могут отработать до обновления token.
       localStorage.setItem('token', newToken)
       if (newRefreshToken) localStorage.setItem('refreshToken', newRefreshToken)
       localStorage.setItem('user', JSON.stringify(userData))
-      
+      flushSync(() => {
+        setToken(newToken)
+        setUser(userData)
+      })
+
       return { success: true }
     } catch (error) {
       const errorMessage = error.response?.data?.error || 

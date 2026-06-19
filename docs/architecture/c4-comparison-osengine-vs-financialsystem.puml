@@ -44,25 +44,30 @@ package "FinancialSystem\n(Maven-монорепозиторий)" as P_FS #E8F5E
   rectangle "API Gateway\nединая точка входа\n8090, JWT" as FSGW
   rectangle "TradingBotService\nроботы, scheduler" as FSBot
   rectangle "PriceService +\nBrokerIntegrationService\nкотировки, брокер" as FSMarket
+  rectangle "MarketHistoryService\nOHLCV, ingestion" as FSHist
   rectangle "TradingTerminalService\nордера" as FSTerm
+  rectangle "JournalService\nжурнал сделок/позиций" as FSJournal
   rectangle "AnalyticsService\nиндикаторы" as FSAn
+  rectangle "BotOptimizationService\nбэктест + grid optimizer" as FSOpt
   rectangle "UserService, AdminPanel,\nDashboard, …" as FSOther
-
-  rectangle "План (нет в pom сейчас)\nBacktestService,\nOptimizerService,\nfs-trading-core" as FSFuture #FFFDE7
 
   FSEur -[hidden]down- FSGW
   FSGW -[#2E7D32]down-> FSBot : /api/bots/**
   FSGW -[#2E7D32]down-> FSMarket
+  FSGW -[#2E7D32]down-> FSHist : /api/market-history/**
   FSGW -[#2E7D32]down-> FSTerm
+  FSGW -[#2E7D32]down-> FSJournal : /api/journal/**
   FSGW -[#2E7D32]down-> FSAn
+  FSGW -[#2E7D32]down-> FSOpt : /api/backtest/**,\n/api/bot-optimization/**
   FSGW -[#2E7D32]down-> FSOther
   FSBot -[#1B5E20]down-> FSAn : Feign
   FSBot -[#1B5E20]down-> FSMarket : Feign
   FSBot -[#1B5E20]down-> FSTerm : Feign
-  FSBot -[hidden]right- FSFuture
+  FSOpt -[#1B5E20]down-> FSHist : Feign\n(свечи)
+  FSOpt -[#1B5E20]down-> FSAn : Feign\n(индикаторы)
 
   note bottom of P_FS
-    **Модульность:** каждый прямоугольник (кроме плана) —
+    **Модульность:** каждый прямоугольник —
     **отдельный Spring Boot** и **свой жизненный цикл**;
     между ними **HTTP + Eureka (lb://)** и **OpenFeign**.
     См. **c4-containers-financialsystem.puml**.
@@ -74,9 +79,10 @@ P_OS -[hidden]right- P_FS
 legend right
   |= Функция OsEngine |= Контур FinancialSystem |
   | Bot Station + скрипты | TradingBotService + Gateway |
-  | Data / OData | BrokerIntegration + PriceService (+ БД истории по дорожной карте) |
-  | Tester | BacktestService (**план**, фаза C) |
-  | Optimizer | OptimizerService / batch (**план**, фаза D) |
+  | Data / OData | MarketHistoryService + BrokerIntegration + PriceService |
+  | Tester | BotOptimizationService (backtest, **реализовано**) |
+  | Optimizer | BotOptimizationService (grid search, **реализовано**) |
+  | Журнал сделок | JournalService |
   | Индикаторы в платформе | AnalyticsService |
 endlegend
 

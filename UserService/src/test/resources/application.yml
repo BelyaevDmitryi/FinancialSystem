@@ -1,4 +1,18 @@
+# Отключаем регистрацию в Eureka в тестах (без реального registry).
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+
 spring:
+  cloud:
+    inetutils:
+      preferred-hostname: localhost
+      default-hostname: localhost
+    client:
+      hostname: localhost
+      ip-address: 127.0.0.1
   datasource:
     url: jdbc:h2:mem:testdb
     driver-class-name: org.h2.Driver
@@ -11,6 +25,8 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
   h2:
     console:
       enabled: true
@@ -21,6 +37,7 @@ spring:
 jwt:
   secret: 5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437
   expiration: 86400000  # 24 hours in milliseconds
+  refresh-expiration: 604800000
 
 api:
   priceServiceConfig:

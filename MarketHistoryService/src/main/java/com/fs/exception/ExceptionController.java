@@ -13,6 +13,13 @@ public class ExceptionController {
 
     private static final Logger log = LoggerFactory.getLogger(ExceptionController.class);
 
+    @ExceptionHandler(ImportJobNotFoundException.class)
+    public ResponseEntity<ErrorDto> handleImportJobNotFound(ImportJobNotFoundException e) {
+        log.warn("Задача импорта не найдена: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorDto(HttpStatus.NOT_FOUND.value(), e.getMessage()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorDto> handleIllegalArgument(IllegalArgumentException e) {
         log.warn("Некорректный запрос: {}", e.getMessage());

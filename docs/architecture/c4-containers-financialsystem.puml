@@ -1,7 +1,7 @@
 @startuml c4-containers-financialsystem
-' Модули из корневого pom.xml: EurekaServer, ApiGateway, BrokerIntegrationService, PriceService, UserService, AnalyticsService, TradingTerminalService, TradingBotService, AdminPanelService, DashboardService.
+' Модули из корневого pom.xml: EurekaServer, ApiGateway, BrokerIntegrationService, PriceService, UserService, AnalyticsService, TradingTerminalService, TradingBotService, AdminPanelService, DashboardService, MarketHistoryService, BotOptimizationService, JournalService.
 ' Маршруты Gateway: application.yml ApiGateway — lb://*-service; discovery locator lower-case-service-id.
-' Принципы: граница bounded context = граница сервиса; межсервисная оркестрация — OpenFeign поверх Eureka (lb://); fs-trading-core (план) — jar без Spring Cloud; будущие BacktestService / Optimizer — см. OS_ENGINE_TRANSFORMATION_ALGORITHM.md.
+' Принципы: граница bounded context = граница сервиса; межсервисная оркестрация — OpenFeign поверх Eureka (lb://); fs-trading-core (план) — jar без Spring Cloud.
 
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
@@ -15,26 +15,29 @@ Person(admin, "Администратор", "Админ-панель и дашб
 System_Boundary(fs, "FinancialSystem") {
 
     Container(eureka, "Eureka Server", "Spring Cloud Netflix Eureka", "Service discovery; единый реестр экземпляров микросервисов.")
-    Container(gateway, "API Gateway", "Spring Cloud Gateway", "Порт 8090; маршруты /api/auth, /api/users, /api/price-service, /api/broker, /api/analytics, /api/orders, /api/bots, /api/admin, /api/dashboard; балансировка lb://…")
+    Container(gateway, "API Gateway", "Spring Cloud Gateway", "Порт 8090; маршруты /api/auth, /api/users, /api/price-service, /api/broker, /api/analytics, /api/orders, /api/bots, /api/journal, /api/market-history, /api/backtest, /api/bot-optimization, /api/admin, /api/dashboard; балансировка lb://…")
 
     Container(user, "User Service", "Spring Boot, JPA", "Аутентификация, пользователи, портфель, профиль.")
-    Container(price, "Price Service", "Spring Boot", "Актуальные цены / кеширование (ориентир Redis в документации).")
-    Container(broker, "Broker Integration Service", "Spring Boot, WebClient", "Адаптеры брокеров (TinkoffBrokerAdapter и др.).")
+    Container(price, "Price Service", "Spring Boot", "Актуальные цены; кеш Redis.")
+    Container(broker, "Broker Integration Service", "Spring Boot, WebClient", "Адаптеры брокеров (TinkoffBrokerAdapter, MockBrokerAdapter).")
     Container(analytics, "Analytics Service", "Spring Boot", "Индикаторы: SMA, EMA, MACD, волатильность.")
     Container(terminal, "Trading Terminal Service", "Spring Boot", "Ордера и торговый контур.")
     Container(bot, "Trading Bot Service", "Spring Boot, Scheduler", "Роботы и стратегии; тики по расписанию.")
+    Container(journal, "Journal Service", "Spring Boot, JPA", "Журнал сделок и позиций.")
+    Container(market_history, "Market History Service", "Spring Boot, JPA", "OHLCV-свечи: импорт и чтение.")
+    Container(bot_opt, "Bot Optimization Service", "Spring Boot", "Бэктест (com.fs.backtest) и grid-оптимизация параметров.")
     Container(admin_panel, "Admin Panel Service", "Spring Boot", "Агрегированная админ-статистика (Feign к другим сервисам).")
     Container(dashboard, "Dashboard Service", "Spring Boot", "Данные для дашборда.")
 
-    ContainerDb(pg, "PostgreSQL", "PostgreSQL 15", "БД сервисов (отдельные схемы/БД по docker/init; не один процесс приложения).")
+    ContainerDb(pg, "PostgreSQL", "PostgreSQL 15", "БД сервисов (отдельные схемы/БД по docker/init).")
+    ContainerDb(redis, "Redis", "Redis 7", "Кэш цен (PriceService).")
 }
 
 System_Ext(broker_api, "API брокера", "Т-Инвестиции и др.")
 
-' Планируемая зависимость Maven — не отдельный runtime-контейнер в docker-compose.
 note as NCore
   **План (не в pom сейчас):** артефакт **fs-trading-core** — общие доменные типы (свеча, интервал, FIGI, сторона сделки), без Spring Cloud / Feign.
-  **Будущее (фазы C–D):** BacktestService, Optimizer — отдельные деплои или модули по docs/OS_ENGINE_TRANSFORMATION_ALGORITHM.md.
+  **Реализовано (фазы C–D, частично):** backtest и optimizer в **BotOptimizationService**; история баров — **MarketHistoryService**.
 end note
 
 Rel(trader, gateway, "HTTPS", "JSON, JWT")
@@ -46,6 +49,9 @@ Rel(gateway, broker, "Маршрутизация", "HTTP lb://broker-integration
 Rel(gateway, analytics, "Маршрутизация", "HTTP lb://analytics-service")
 Rel(gateway, terminal, "Маршрутизация", "HTTP lb://trading-terminal-service")
 Rel(gateway, bot, "Маршрутизация", "HTTP lb://trading-bot-service")
+Rel(gateway, journal, "Маршрутизация", "HTTP lb://journal-service")
+Rel(gateway, market_history, "Маршрутизация", "HTTP lb://market-history-service")
+Rel(gateway, bot_opt, "Маршрутизация", "HTTP lb://bot-optimization-service")
 Rel(gateway, admin_panel, "Маршрутизация", "HTTP lb://admin-panel-service")
 Rel(gateway, dashboard, "Маршрутизация", "HTTP lb://dashboard-service")
 
@@ -55,6 +61,9 @@ Rel(broker, eureka, "Регистрация / discovery", "HTTP")
 Rel(analytics, eureka, "Регистрация / discovery", "HTTP")
 Rel(terminal, eureka, "Регистрация / discovery", "HTTP")
 Rel(bot, eureka, "Регистрация / discovery", "HTTP")
+Rel(journal, eureka, "Регистрация / discovery", "HTTP")
+Rel(market_history, eureka, "Регистрация / discovery", "HTTP")
+Rel(bot_opt, eureka, "Регистрация / discovery", "HTTP")
 Rel(admin_panel, eureka, "Регистрация / discovery", "HTTP")
 Rel(dashboard, eureka, "Регистрация / discovery", "HTTP")
 Rel(gateway, eureka, "Получение инстансов", "HTTP")
@@ -64,6 +73,10 @@ Rel(broker, broker_api, "Котировки, заявки", "HTTPS")
 Rel(user, pg, "JDBC", "SQL")
 Rel(terminal, pg, "JDBC", "SQL")
 Rel(bot, pg, "JDBC", "SQL")
+Rel(journal, pg, "JDBC", "SQL")
+Rel(market_history, pg, "JDBC", "SQL")
+Rel(price, redis, "Кэш цен", "Redis protocol")
+
 Rel_R(admin_panel, user, "Feign", "HTTP JSON")
 Rel_R(admin_panel, bot, "Feign", "HTTP JSON")
 Rel_R(admin_panel, terminal, "Feign", "HTTP JSON")
@@ -82,10 +95,16 @@ Rel_R(user, broker, "Feign", "HTTP JSON")
 
 Rel_R(terminal, broker, "Feign", "HTTP JSON")
 Rel_R(terminal, user, "Feign", "HTTP JSON")
+Rel_R(terminal, journal, "Feign", "HTTP JSON")
 
 Rel_R(price, broker, "Feign", "HTTP JSON")
 
 Rel_R(analytics, price, "Feign", "HTTP JSON")
+
+Rel_R(bot_opt, market_history, "Feign", "HTTP JSON")
+Rel_R(bot_opt, analytics, "Feign", "HTTP JSON")
+
+Rel_R(market_history, broker, "Feign", "HTTP JSON")
 
 note bottom of fs
   **Не один deployable:** каждый контейнер — отдельный Spring Boot-приложение со своим жизненным циклом и масштабированием.

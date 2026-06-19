@@ -18,6 +18,8 @@ import java.io.IOException;
 
 public class AuthTokenFilter extends OncePerRequestFilter {
 
+    private static final String GATEWAY_INTERNAL_JWT_HEADER = "X-Gateway-Internal-Jwt";
+
     private final JwtUtils jwtUtils;
     private final UserDetailsServiceImpl userDetailsService;
     private static final Logger logger = LoggerFactory.getLogger(AuthTokenFilter.class);
@@ -48,10 +50,14 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     }
 
     private String parseJwt(HttpServletRequest request) {
+        String internal = request.getHeader(GATEWAY_INTERNAL_JWT_HEADER);
+        if (StringUtils.hasText(internal)) {
+            return internal.trim();
+        }
         String headerAuth = request.getHeader("Authorization");
 
         if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
-            return headerAuth.substring(7);
+            return headerAuth.substring(7).trim();
         }
 
         return null;

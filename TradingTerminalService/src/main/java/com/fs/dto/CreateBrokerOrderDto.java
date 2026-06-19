@@ -34,9 +34,14 @@ public class CreateBrokerOrderDto {
     private String direction;
     
     /**
-     * Тип заявки: LIMIT (лимитная) или MARKET (рыночная)
+     * Тип заявки: MARKET, LIMIT или STOP.
      */
     private String orderType;
+
+    /**
+     * Цена активации стоп-заявки (для STOP).
+     */
+    private BigDecimal stopPrice;
     
     /**
      * Комментарий к заявке

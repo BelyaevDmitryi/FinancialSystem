@@ -31,4 +31,7 @@ public class CreateBotDto {
     private BigDecimal maxPrice;
     private Integer smaPeriod;
     private Integer emaPeriod;
+
+    /** Paper-режим: ордера без вызова брокера. null → fs.bot.default-paper. */
+    private Boolean paper;
 }

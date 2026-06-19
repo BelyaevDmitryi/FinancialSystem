@@ -1,0 +1,289 @@
+# Тестовая среда FinancialSystem — без Tinkoff API, frontend, admin, dashboard, optimization, market-history.
+# Включает price-service, analytics-service и journal-service (ADR-002).
+
+services:
+  eureka-server:
+    build:
+      context: ./EurekaServer
+      dockerfile: Dockerfile
+    container_name: eureka-server-test
+    ports:
+      - "8761:8761"
+    environment:
+      SERVER_PORT: 8761
+    networks:
+      - financial-test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: financial-system-postgres-test
+    restart: always
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: financial_system
+    networks:
+      - financial-test-network
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  redis:
+    image: redis:7.0-alpine
+    container_name: redis-test
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - financial-test-network
+    volumes:
+      - redis_test_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  broker-integration-service:
+    build:
+      context: ./BrokerIntegrationService
+      dockerfile: Dockerfile
+    container_name: broker-integration-service-test
+    ports:
+      - "8004:8004"
+    environment:
+      SERVER_PORT: 8004
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-test}
+      TBANK_TOKEN: ${TBANK_TOKEN:-mock}
+    networks:
+      - financial-test-network
+    depends_on:
+      eureka-server:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  price-service:
+    build:
+      context: ./PriceService
+      dockerfile: Dockerfile
+    container_name: price-service-test
+    ports:
+      - "8003:8003"
+    environment:
+      SERVER_PORT: 8003
+    networks:
+      - financial-test-network
+    depends_on:
+      eureka-server:
+        condition: service_started
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  user-service:
+    build:
+      context: ./UserService
+      dockerfile: Dockerfile
+    container_name: user-service-test
+    ports:
+      - "8001:8001"
+    environment:
+      SERVER_PORT: 8001
+      JWT_SECRET: ${JWT_SECRET:-5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437}
+      SPRING_DATASOURCE_HOST: postgres
+      SPRING_DATASOURCE_PORT: 5432
+      SPRING_DATASOURCE_DATABASE: userdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      API_PRICE_SERVICE_CONFIG_PRICE_SERVICE: http://price-service:8003
+      API_BROKER_CONFIG_BROKER_INTEGRATION_SERVICE: http://broker-integration-service:8004
+    networks:
+      - financial-test-network
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      broker-integration-service:
+        condition: service_started
+      price-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  analytics-service:
+    build:
+      context: ./AnalyticsService
+      dockerfile: Dockerfile
+    container_name: analytics-service-test
+    ports:
+      - "8005:8005"
+    environment:
+      SERVER_PORT: 8005
+    networks:
+      - financial-test-network
+    depends_on:
+      eureka-server:
+        condition: service_started
+      price-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  trading-terminal-service:
+    build:
+      context: ./TradingTerminalService
+      dockerfile: Dockerfile
+    container_name: trading-terminal-service-test
+    ports:
+      - "8006:8006"
+    environment:
+      SERVER_PORT: 8006
+      JWT_SECRET: ${JWT_SECRET:-5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437}
+      SPRING_DATASOURCE_HOST: postgres
+      SPRING_DATASOURCE_PORT: 5432
+      SPRING_DATASOURCE_DATABASE: tradingdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      BROKER_INTEGRATION_ENABLED: ${BROKER_INTEGRATION_ENABLED:-false}
+      BROKER_ACCOUNT_ID: ${BROKER_ACCOUNT_ID:-}
+    networks:
+      - financial-test-network
+    depends_on:
+      eureka-server:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      price-service:
+        condition: service_started
+      user-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  trading-bot-service:
+    build:
+      context: ./TradingBotService
+      dockerfile: Dockerfile
+    container_name: trading-bot-service-test
+    ports:
+      - "8007:8007"
+    environment:
+      SERVER_PORT: 8007
+      BOT_SCHEDULER_FIXED_DELAY: ${BOT_SCHEDULER_FIXED_DELAY:-10000}
+      SPRING_DATASOURCE_HOST: postgres
+      SPRING_DATASOURCE_PORT: 5432
+      SPRING_DATASOURCE_DATABASE: botdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+    networks:
+      - financial-test-network
+    depends_on:
+      eureka-server:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      analytics-service:
+        condition: service_started
+      trading-terminal-service:
+        condition: service_started
+      price-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8007/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  journal-service:
+    build:
+      context: ./JournalService
+      dockerfile: Dockerfile
+    container_name: journal-service-test
+    ports:
+      - "8012:8012"
+    environment:
+      SERVER_PORT: 8012
+      JWT_SECRET: ${JWT_SECRET:-5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437}
+      SPRING_DATASOURCE_HOST: postgres
+      SPRING_DATASOURCE_PORT: 5432
+      SPRING_DATASOURCE_DATABASE: journaldb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+    networks:
+      - financial-test-network
+    depends_on:
+      eureka-server:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8012/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  api-gateway:
+    build:
+      context: ./ApiGateway
+      dockerfile: Dockerfile
+    container_name: api-gateway-test
+    ports:
+      - "8090:8090"
+    environment:
+      SERVER_PORT: 8090
+      JWT_SECRET: ${JWT_SECRET:-5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437}
+    networks:
+      - financial-test-network
+    depends_on:
+      # Шлюз поднимается после регистрации user-service в Eureka во избежание 503 на /api/auth/**.
+      eureka-server:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  financial-test-network:
+    driver: bridge
+
+volumes:
+  postgres_test_data:
+  redis_test_data:

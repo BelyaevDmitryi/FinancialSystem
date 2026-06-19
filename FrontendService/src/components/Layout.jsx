@@ -23,6 +23,9 @@ import {
   TrendingUp as TrendingUpIcon,
   Analytics as AnalyticsIcon,
   SmartToy as SmartToyIcon,
+  Timeline as BacktestIcon,
+  Tune as OptimizerIcon,
+  ReceiptLong as JournalIcon,
   AdminPanelSettings as AdminIcon,
   Logout as LogoutIcon,
   Person as PersonIcon,
@@ -37,6 +40,9 @@ const getMenuItems = (userRoles) => {
     { text: 'Торговля', icon: <TrendingUpIcon />, path: '/trading' },
     { text: 'Аналитика', icon: <AnalyticsIcon />, path: '/analytics' },
     { text: 'Боты', icon: <SmartToyIcon />, path: '/bots' },
+    { text: 'Backtest', icon: <BacktestIcon />, path: '/backtest' },
+    { text: 'Optimizer', icon: <OptimizerIcon />, path: '/optimizer' },
+    { text: 'Journal', icon: <JournalIcon />, path: '/journal' },
   ]
   
   // Показываем админ панель только для ADMIN и OWNER

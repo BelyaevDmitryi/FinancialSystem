@@ -1,6 +1,9 @@
 server:
   port: 8009
 
+dashboard:
+  price-baseline: REDIS_SNAPSHOT
+
 spring:
   application:
     name: dashboard-service
