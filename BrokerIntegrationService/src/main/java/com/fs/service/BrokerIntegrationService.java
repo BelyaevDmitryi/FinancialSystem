@@ -1,7 +1,9 @@
 package com.fs.service;
 
 import com.fs.adapter.BrokerAdapter;
+import com.fs.adapter.moex.MoexFigi;
 import com.fs.dto.BrokerCandleDto;
+import com.fs.dto.AmendBrokerOrderDto;
 import com.fs.dto.BrokerOrderDto;
 import com.fs.dto.CreateBrokerOrderDto;
 import com.fs.dto.FigiesDto;
@@ -46,8 +48,16 @@ public class BrokerIntegrationService {
      */
     public Stock getStockByTicker(String ticker, String brokerName) {
         log.debug("Getting stock {} from broker {}", ticker, brokerName);
+        if (usesTinkoffWithMoexFallback(brokerName)) {
+            return brokerFactory.getStockByTickerWithFallback(ticker);
+        }
         BrokerAdapter adapter = brokerFactory.getBrokerAdapter(brokerName);
         return adapter.getStockByTicker(ticker);
+    }
+
+    private boolean usesTinkoffWithMoexFallback(String brokerName) {
+        String effectiveBroker = brokerName != null ? brokerName : defaultBroker;
+        return "TINKOFF".equalsIgnoreCase(effectiveBroker);
     }
     
     /**
@@ -94,6 +104,9 @@ public class BrokerIntegrationService {
      */
     public OrderBookDto getOrderBook(String figi, int depth, String brokerName) {
         log.debug("Getting order book for figi {} from broker {} with depth {}", figi, brokerName, depth);
+        if (usesTinkoffWithMoexFallback(brokerName) && MoexFigi.toTicker(figi).isPresent()) {
+            return brokerFactory.getOrderBookWithFallback(figi, depth);
+        }
         BrokerAdapter adapter = brokerFactory.getBrokerAdapter(brokerName);
         return adapter.getOrderBook(figi, depth);
     }
@@ -130,6 +143,23 @@ public class BrokerIntegrationService {
         return adapter.placeOrder(accountId, createOrderDto);
     }
     
+    /**
+     * Изменить параметры заявки на бирже.
+     */
+    public BrokerOrderDto amendOrder(String accountId, String orderId, AmendBrokerOrderDto amendDto) {
+        return amendOrder(accountId, orderId, amendDto, defaultBroker);
+    }
+
+    /**
+     * Изменить параметры заявки с указанием брокера.
+     */
+    public BrokerOrderDto amendOrder(String accountId, String orderId, AmendBrokerOrderDto amendDto,
+            String brokerName) {
+        log.debug("Amending order {} on broker {} for account {}", orderId, brokerName, accountId);
+        BrokerAdapter adapter = brokerFactory.getBrokerAdapter(brokerName);
+        return adapter.amendOrder(accountId, orderId, amendDto);
+    }
+
     /**
      * Отменить заявку на бирже
      */

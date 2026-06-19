@@ -7,39 +7,44 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 
 /**
- * DTO для создания заявки на бирже через брокера
+ * DTO для создания заявки на бирже через брокера.
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateBrokerOrderDto {
     /**
-     * FIGI инструмента
+     * FIGI инструмента.
      */
     private String figi;
-    
+
     /**
-     * Количество лотов
+     * Количество лотов.
      */
     private Long quantity;
-    
+
     /**
-     * Цена за единицу (null для рыночной заявки)
+     * Цена за единицу (null для рыночной заявки).
      */
     private BigDecimal price;
-    
+
     /**
-     * Тип заявки: BUY или SELL
+     * Направление: BUY или SELL.
      */
     private String direction;
-    
+
     /**
-     * Тип заявки: LIMIT (лимитная) или MARKET (рыночная)
+     * Тип заявки: MARKET, LIMIT или STOP.
      */
     private String orderType;
-    
+
     /**
-     * Комментарий к заявке
+     * Цена активации стоп-заявки (обязательна для STOP).
+     */
+    private BigDecimal stopPrice;
+
+    /**
+     * Комментарий к заявке.
      */
     private String comment;
 }

@@ -43,4 +43,23 @@ public class Order {
     
     private LocalDateTime executedAt;
     private String comment;
+
+    @Column(name = "broker_order_id")
+    private String brokerOrderId;
+
+    @Column(name = "broker_code")
+    private String brokerCode;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "order_type")
+    private BrokerOrderType orderType;
+
+    @Column(name = "stop_price")
+    private BigDecimal stopPrice;
+
+    @Column(name = "broker_status")
+    private String brokerStatus;
+
+    @Column(nullable = false)
+    private boolean paper = false;
 }

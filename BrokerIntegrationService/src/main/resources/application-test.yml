@@ -1,0 +1,21 @@
+tbank:
+  token: mock
+
+broker:
+  default: MOCK
+
+# В docker-compose.test.yml сервис должен быть в Eureka для Feign из TradingTerminalService.
+eureka:
+  client:
+    enabled: true
+    register-with-eureka: true
+    fetch-registry: true
+
+spring:
+  cloud:
+    loadbalancer:
+      enabled: true
+
+logging:
+  level:
+    com.fs: DEBUG

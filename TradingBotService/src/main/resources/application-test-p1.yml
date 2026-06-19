@@ -1,0 +1,4 @@
+# P1 overlay profile: MarketHistory candle provider enabled (RM2, ADR-002 §1).
+market-history:
+  candles:
+    enabled: true

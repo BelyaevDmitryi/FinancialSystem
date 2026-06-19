@@ -76,6 +76,14 @@ const ProfilePage = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [accountToDelete, setAccountToDelete] = useState(null)
 
+  /** Tinkoff Invest: временный API-токен для запроса списка счетов (не отправляется на сервер при привязке). */
+  const [brokerApiToken, setBrokerApiToken] = useState('')
+  const [sandboxToken, setSandboxToken] = useState(false)
+  const [discoveredAccounts, setDiscoveredAccounts] = useState([])
+  const [discoverLoading, setDiscoverLoading] = useState(false)
+  /** Выбранный из списка внешний id счёта (после /discover). */
+  const [selectedDiscoveredExternalId, setSelectedDiscoveredExternalId] = useState('')
+
   useEffect(() => {
     fetchProfile()
   }, [])
@@ -134,22 +142,86 @@ const ProfilePage = () => {
     }
   }
 
-  const handleAddBrokerAccount = async () => {
-    if (!addAccountForm.brokerCode || !addAccountForm.externalAccountId?.trim()) {
-      setBrokerAccountError('Выберите брокера и укажите ID счёта у брокера')
+  const handleDiscoverBrokerAccounts = async () => {
+    if (!addAccountForm.brokerCode) {
+      setBrokerAccountError('Сначала выберите брокера')
       return
+    }
+    if (!brokerApiToken?.trim()) {
+      setBrokerAccountError('Введите API-токен')
+      return
+    }
+    try {
+      setDiscoverLoading(true)
+      setBrokerAccountError('')
+      const response = await api.post('/api/profile/broker-accounts/discover', {
+        brokerCode: addAccountForm.brokerCode,
+        apiToken: brokerApiToken.trim(),
+        sandbox: sandboxToken,
+      })
+      const list = response.data || []
+      setDiscoveredAccounts(list)
+      setSelectedDiscoveredExternalId('')
+      if (list.length === 0) {
+        setBrokerAccountError(
+          'Подходящих счетов не найдено. Проверьте токен и режим (биржа или песочница Т-Инвестиций).',
+        )
+      }
+    } catch (err) {
+      const msg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        'Не удалось получить счета по токену'
+      setBrokerAccountError(msg)
+      setDiscoveredAccounts([])
+      setSelectedDiscoveredExternalId('')
+    } finally {
+      setDiscoverLoading(false)
+    }
+  }
+
+  const resetAddBrokerAccountUi = () => {
+    setAddAccountOpen(false)
+    setAddAccountForm({ brokerCode: '', externalAccountId: '', displayName: '', isDefault: false })
+    setBrokerApiToken('')
+    setSandboxToken(false)
+    setDiscoveredAccounts([])
+    setSelectedDiscoveredExternalId('')
+    setBrokerAccountError('')
+  }
+
+  const handleAddBrokerAccount = async () => {
+    const tinkoffSelected = selectedDiscoveredExternalId || ''
+    const manualExternal = addAccountForm.externalAccountId?.trim() || ''
+    const externalResolved = tinkoffSelected || manualExternal
+
+    const isTinkoff = addAccountForm.brokerCode === 'TINKOFF'
+    if (!addAccountForm.brokerCode || !externalResolved) {
+      setBrokerAccountError(
+        isTinkoff
+          ? 'Для Т-Инвестиций нажмите «Загрузить счета по токену» и выберите счёт из списка (или укажите его ID вручную ниже)'
+          : 'Выберите брокера и укажите ID счёта у брокера',
+      )
+      return
+    }
+
+    let displayName = addAccountForm.displayName?.trim() || null
+    if (!displayName && tinkoffSelected) {
+      const row = discoveredAccounts.find((a) => a.externalAccountId === tinkoffSelected)
+      if (row?.name) {
+        displayName = row.name
+      }
     }
     try {
       setBrokerAccountSaving(true)
       setBrokerAccountError('')
       await api.post('/api/profile/broker-accounts', {
         brokerCode: addAccountForm.brokerCode,
-        externalAccountId: addAccountForm.externalAccountId.trim(),
-        displayName: addAccountForm.displayName?.trim() || null,
+        externalAccountId: externalResolved,
+        displayName,
         isDefault: addAccountForm.isDefault,
       })
-      setAddAccountOpen(false)
-      setAddAccountForm({ brokerCode: '', externalAccountId: '', displayName: '', isDefault: false })
+      resetAddBrokerAccountUi()
       setSuccess('Счёт успешно привязан')
       await fetchBrokerAccounts()
     } catch (err) {
@@ -165,10 +237,19 @@ const ProfilePage = () => {
     try {
       setBrokerAccountSaving(true)
       setBrokerAccountError('')
-      await api.put(`/api/profile/broker-accounts/${accountToEdit.id}`, {
-        displayName: editAccountForm.displayName?.trim() || null,
-        isDefault: editAccountForm.isDefault,
-      })
+      await api.put(
+        '/api/profile/broker-accounts/external',
+        {
+          displayName: editAccountForm.displayName?.trim() || null,
+          isDefault: editAccountForm.isDefault,
+        },
+        {
+          params: {
+            brokerCode: accountToEdit.broker?.code,
+            externalAccountId: accountToEdit.externalAccountId,
+          },
+        },
+      )
       setEditAccountOpen(false)
       setAccountToEdit(null)
       setEditAccountForm({ displayName: '', isDefault: false })
@@ -187,7 +268,12 @@ const ProfilePage = () => {
     try {
       setBrokerAccountSaving(true)
       setBrokerAccountError('')
-      await api.delete(`/api/profile/broker-accounts/${accountToDelete.id}`)
+      await api.delete('/api/profile/broker-accounts/external', {
+        params: {
+          brokerCode: accountToDelete.broker?.code,
+          externalAccountId: accountToDelete.externalAccountId,
+        },
+      })
       setDeleteConfirmOpen(false)
       setAccountToDelete(null)
       setSuccess('Счёт отвязан')
@@ -428,6 +514,10 @@ const ProfilePage = () => {
             startIcon={<Add />}
             onClick={() => {
               setAddAccountForm({ brokerCode: '', externalAccountId: '', displayName: '', isDefault: false })
+              setBrokerApiToken('')
+              setSandboxToken(false)
+              setDiscoveredAccounts([])
+              setSelectedDiscoveredExternalId('')
               setBrokerAccountError('')
               setAddAccountOpen(true)
             }}
@@ -437,7 +527,8 @@ const ProfilePage = () => {
           </Button>
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Привяжите счета у брокеров для торговли. Один счёт можно отметить как счёт по умолчанию.
+          Для Т-Инвестиций введите API-токен — список счетов загрузится с брокера; токен не сохраняется. Другие брокеры
+          пока привязываются по ID счёта. Редактирование и отвязка считаются по брокеру и ID счёта у брокера.
         </Typography>
         {(brokersLoadError || brokerAccountsLoadError) && (
           <Alert severity="warning" sx={{ mb: 2 }} onClose={() => { setBrokersLoadError(''); setBrokerAccountsLoadError('') }}>
@@ -767,7 +858,7 @@ const ProfilePage = () => {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={addAccountOpen} onClose={() => setAddAccountOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={addAccountOpen} onClose={resetAddBrokerAccountUi} maxWidth="sm" fullWidth>
         <DialogTitle>Привязать счёт у брокера</DialogTitle>
         <DialogContent>
           {brokerAccountError && (
@@ -780,22 +871,100 @@ const ProfilePage = () => {
             <Select
               value={addAccountForm.brokerCode}
               label="Брокер"
-              onChange={(e) => setAddAccountForm({ ...addAccountForm, brokerCode: e.target.value })}
+              onChange={(e) => {
+                setDiscoveredAccounts([])
+                setSelectedDiscoveredExternalId('')
+                setAddAccountForm({ ...addAccountForm, brokerCode: e.target.value })
+              }}
             >
               {brokers.map((b) => (
                 <MenuItem key={b.id} value={b.code}>{b.name || b.code}</MenuItem>
               ))}
             </Select>
           </FormControl>
-          <TextField
-            fullWidth
-            label="ID счёта у брокера"
-            value={addAccountForm.externalAccountId}
-            onChange={(e) => setAddAccountForm({ ...addAccountForm, externalAccountId: e.target.value })}
-            required
-            sx={{ mb: 2 }}
-            helperText="Идентификатор счёта в системе брокера"
-          />
+          {addAccountForm.brokerCode === 'TINKOFF' ? (
+            <>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Вставьте токен с портала Т-Инвестиций. Он используется только для одного запроса списка счетов.
+              </Typography>
+              <TextField
+                fullWidth
+                type="password"
+                label="API-токен"
+                autoComplete="off"
+                value={brokerApiToken}
+                onChange={(e) => setBrokerApiToken(e.target.value)}
+                sx={{ mb: 1 }}
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={sandboxToken}
+                    onChange={(e) => setSandboxToken(e.target.checked)}
+                  />
+                }
+                label="Токен песочницы (не боевой счёт)"
+                sx={{ mb: 2 }}
+              />
+              <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                <Button
+                  variant="outlined"
+                  onClick={handleDiscoverBrokerAccounts}
+                  disabled={discoverLoading || brokerAccountSaving || !brokerApiToken?.trim()}
+                >
+                  {discoverLoading ? <CircularProgress size={24} /> : 'Загрузить счета по токену'}
+                </Button>
+              </Box>
+              {discoveredAccounts.length > 0 && (
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel>Счёт</InputLabel>
+                  <Select
+                    value={selectedDiscoveredExternalId}
+                    label="Счёт"
+                    onChange={(e) => {
+                      const id = e.target.value
+                      setSelectedDiscoveredExternalId(id)
+                      const picked = discoveredAccounts.find((x) => x.externalAccountId === id)
+                      setAddAccountForm((prev) =>
+                        ({
+                          ...prev,
+                          ...(picked?.name && !prev.displayName?.trim() ? { displayName: picked.name } : {}),
+                        }),
+                      )
+                    }}
+                  >
+                    {discoveredAccounts.map((a) => (
+                      <MenuItem key={a.externalAccountId} value={a.externalAccountId}>
+                        {[a.name, a.accountType, a.externalAccountId].filter(Boolean).join(' · ') || a.externalAccountId}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                При необходимости можно указать идентификатор счёта вручную (если список не загрузился):
+              </Typography>
+              <TextField
+                fullWidth
+                label="Идентификатор счёта вручную (необязательно)"
+                value={addAccountForm.externalAccountId}
+                onChange={(e) =>
+                  setAddAccountForm({ ...addAccountForm, externalAccountId: e.target.value })
+                }
+                sx={{ mb: 2 }}
+              />
+            </>
+          ) : (
+            <TextField
+              fullWidth
+              label="ID счёта у брокера"
+              value={addAccountForm.externalAccountId}
+              onChange={(e) => setAddAccountForm({ ...addAccountForm, externalAccountId: e.target.value })}
+              required
+              sx={{ mb: 2 }}
+              helperText="Идентификатор счёта в системе брокера"
+            />
+          )}
           <TextField
             fullWidth
             label="Название (необязательно)"
@@ -814,7 +983,7 @@ const ProfilePage = () => {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAddAccountOpen(false)}>Отмена</Button>
+          <Button onClick={resetAddBrokerAccountUi}>Отмена</Button>
           <Button onClick={handleAddBrokerAccount} variant="contained" disabled={brokerAccountSaving}>
             {brokerAccountSaving ? <CircularProgress size={24} /> : 'Привязать'}
           </Button>

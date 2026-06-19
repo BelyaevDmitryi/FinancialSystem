@@ -1,0 +1,44 @@
+2026-06-19T04:07:51.249+03:00  INFO 83326 --- [dashboard-service] [main] c.fs.controller.DashboardControllerTest  : Starting DashboardControllerTest using Java 25.0.2 with PID 83326 (started by belyaev.dmitryi in /Users/belyaev.dmitryi/CursorProjects/FinancialSystem/DashboardService)
+2026-06-19T04:07:51.251+03:00  INFO 83326 --- [dashboard-service] [main] c.fs.controller.DashboardControllerTest  : No active profile set, falling back to 1 default profile: "default"
+2026-06-19T04:07:52.002+03:00  WARN 83326 --- [dashboard-service] [main] .s.s.UserDetailsServiceAutoConfiguration : 
+
+Using generated security password: 0ac50bea-ed3b-47dd-891e-d43ac278577f
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-06-19T04:07:52.009+03:00  INFO 83326 --- [dashboard-service] [main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2026-06-19T04:07:52.062+03:00  INFO 83326 --- [dashboard-service] [main] o.s.v.b.OptionalValidatorFactoryBean     : Failed to set up a Bean Validation provider: jakarta.validation.NoProviderFoundException: Unable to create a Configuration, because no Jakarta Bean Validation provider could be found. Add a provider like Hibernate Validator (RI) to your classpath.
+2026-06-19T04:07:52.187+03:00  INFO 83326 --- [dashboard-service] [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-06-19T04:07:52.187+03:00  INFO 83326 --- [dashboard-service] [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-06-19T04:07:52.187+03:00  INFO 83326 --- [dashboard-service] [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-06-19T04:07:52.201+03:00  INFO 83326 --- [dashboard-service] [main] c.fs.controller.DashboardControllerTest  : Started DashboardControllerTest in 1.117 seconds (process running for 1.542)
+2026-06-19T04:07:52.235+03:00  INFO 83326 --- [dashboard-service] [main] com.fs.controller.DashboardController    : Запрос дашборда для пользователя: 42
+2026-06-19T04:07:52.235+03:00  INFO 83326 --- [dashboard-service] [main] com.fs.service.DashboardService          : Получение дашборда для пользователя: 42
+2026-06-19T04:07:52.321+03:00  INFO 83326 --- [dashboard-service] [main] com.fs.service.DashboardService          : Получение дашборда для пользователя: 42
+2026-06-19T04:07:52.321+03:00  INFO 83326 --- [dashboard-service] [main] com.fs.service.DashboardService          : Journal пуст для пользователя 42, fallback на UserService positions
+2026-06-19T04:07:52.326+03:00  INFO 83326 --- [dashboard-service] [main] com.fs.service.DashboardService          : Получение дашборда для пользователя: 42
+2026-06-19T04:07:52.332+03:00  INFO 83326 --- [dashboard-service] [main] com.fs.service.DashboardService          : Получение дашборда для пользователя: 42
+2026-06-19T04:07:52.339+03:00  WARN 83326 --- [dashboard-service] [main] com.fs.service.PriceBaselineService      : MarketHistory недоступен для FIGI FIGI1: service unavailable
+2026-06-19T04:07:52.339+03:00  WARN 83326 --- [dashboard-service] [main] com.fs.service.PriceBaselineService      : MarketHistory не вернул baseline цены для FIGI [FIGI1]. daily change = 0
+2026-06-19T04:19:31.684+03:00  INFO 95715 --- [dashboard-service] [main] c.fs.controller.DashboardControllerTest  : Starting DashboardControllerTest using Java 25.0.2 with PID 95715 (started by belyaev.dmitryi in /Users/belyaev.dmitryi/CursorProjects/FinancialSystem/DashboardService)
+2026-06-19T04:19:31.686+03:00  INFO 95715 --- [dashboard-service] [main] c.fs.controller.DashboardControllerTest  : No active profile set, falling back to 1 default profile: "default"
+2026-06-19T04:19:32.403+03:00  WARN 95715 --- [dashboard-service] [main] .s.s.UserDetailsServiceAutoConfiguration : 
+
+Using generated security password: 5171c1d5-7895-41dd-8dfc-c7d7daf8601b
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-06-19T04:19:32.410+03:00  INFO 95715 --- [dashboard-service] [main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2026-06-19T04:19:32.459+03:00  INFO 95715 --- [dashboard-service] [main] o.s.v.b.OptionalValidatorFactoryBean     : Failed to set up a Bean Validation provider: jakarta.validation.NoProviderFoundException: Unable to create a Configuration, because no Jakarta Bean Validation provider could be found. Add a provider like Hibernate Validator (RI) to your classpath.
+2026-06-19T04:19:32.580+03:00  INFO 95715 --- [dashboard-service] [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-06-19T04:19:32.580+03:00  INFO 95715 --- [dashboard-service] [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-06-19T04:19:32.580+03:00  INFO 95715 --- [dashboard-service] [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-06-19T04:19:32.594+03:00  INFO 95715 --- [dashboard-service] [main] c.fs.controller.DashboardControllerTest  : Started DashboardControllerTest in 1.057 seconds (process running for 1.471)
+2026-06-19T04:19:32.626+03:00  INFO 95715 --- [dashboard-service] [main] com.fs.controller.DashboardController    : Запрос дашборда для пользователя: 42
+2026-06-19T04:19:32.626+03:00  INFO 95715 --- [dashboard-service] [main] com.fs.service.DashboardService          : Получение дашборда для пользователя: 42
+2026-06-19T04:19:32.715+03:00  INFO 95715 --- [dashboard-service] [main] com.fs.service.DashboardService          : Получение дашборда для пользователя: 42
+2026-06-19T04:19:32.716+03:00  INFO 95715 --- [dashboard-service] [main] com.fs.service.DashboardService          : Journal пуст для пользователя 42, fallback на UserService positions
+2026-06-19T04:19:32.720+03:00  INFO 95715 --- [dashboard-service] [main] com.fs.service.DashboardService          : Получение дашборда для пользователя: 42
+2026-06-19T04:19:32.725+03:00  INFO 95715 --- [dashboard-service] [main] com.fs.service.DashboardService          : Получение дашборда для пользователя: 42
+2026-06-19T04:19:32.731+03:00  WARN 95715 --- [dashboard-service] [main] com.fs.service.PriceBaselineService      : MarketHistory недоступен для FIGI FIGI1: service unavailable
+2026-06-19T04:19:32.731+03:00  WARN 95715 --- [dashboard-service] [main] com.fs.service.PriceBaselineService      : MarketHistory не вернул baseline цены для FIGI [FIGI1]. daily change = 0

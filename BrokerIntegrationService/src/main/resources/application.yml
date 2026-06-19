@@ -10,6 +10,9 @@ spring:
 
 broker:
   default: TINKOFF  # По умолчанию используется Tinkoff
+  moex:
+    base-url: https://iss.moex.com
+    board: TQBR
 
 eureka:
   client:

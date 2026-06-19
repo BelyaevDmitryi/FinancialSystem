@@ -18,7 +18,7 @@ public class StockWithPrice {
     String source;
     BigDecimal price;
 
-    public StockWithPrice(Stock stock,BigDecimal price) {
+    public StockWithPrice(Stock stock, BigDecimal price) {
         this.ticker = stock.getTicker();
         this.figi = stock.getFigi();
         this.name = stock.getName();
@@ -26,5 +26,10 @@ public class StockWithPrice {
         this.currency = stock.getCurrency();
         this.source = stock.getSource();
         this.price = price;
+    }
+
+    public StockWithPrice(Stock stock, BigDecimal price, String source) {
+        this(stock, price);
+        this.source = source;
     }
 }

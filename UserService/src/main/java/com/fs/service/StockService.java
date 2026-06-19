@@ -75,4 +75,11 @@ public class StockService {
     public List<Stock> getStocksByTickers(List<String> tickers) {
         return stockRepository.findByTickerIn(tickers);
     }
+
+    public List<Stock> getStocksByFigis(List<String> figis) {
+        if (figis == null || figis.isEmpty()) {
+            return List.of();
+        }
+        return stockRepository.findByFigiIn(figis);
+    }
 }

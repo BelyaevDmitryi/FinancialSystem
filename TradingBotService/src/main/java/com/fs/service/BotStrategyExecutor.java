@@ -2,86 +2,50 @@ package com.fs.service;
 
 import com.fs.domain.BotStrategy;
 import com.fs.domain.TradingBot;
-import com.fs.dto.*;
-import com.fs.feignclient.AnalyticsServiceClient;
-import lombok.RequiredArgsConstructor;
+import com.fs.strategy.*;
+import com.fs.trading.core.TradeSignal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
-import java.util.List;
+import java.util.EnumMap;
+import java.util.Map;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class BotStrategyExecutor {
 
-    private final AnalyticsServiceClient analyticsServiceClient;
+    private final Map<BotStrategy, TradingStrategy> strategies;
 
-    public boolean shouldTrade(TradingBot bot, List<PriceDataDto> prices) {
+    public BotStrategyExecutor(
+            SmaCrossoverStrategyAdapter smaCrossoverStrategy,
+            MacdCrossoverStrategyAdapter macdCrossoverStrategy,
+            EmaTrendStrategyAdapter emaTrendStrategy,
+            VolatilityBreakoutStrategyAdapter volatilityBreakoutStrategy) {
+        strategies = new EnumMap<>(BotStrategy.class);
+        strategies.put(BotStrategy.SMA_CROSSOVER, smaCrossoverStrategy);
+        strategies.put(BotStrategy.MACD_CROSSOVER, macdCrossoverStrategy);
+        strategies.put(BotStrategy.EMA_TREND, emaTrendStrategy);
+        strategies.put(BotStrategy.VOLATILITY_BREAKOUT, volatilityBreakoutStrategy);
+    }
+
+    public TradeSignal evaluate(TradingBot bot, StrategyContext context) {
+        log.debug("Оценка сигнала: botId={}, strategy={}, figi={}, candles.size={}, position={}",
+                bot.getId(), bot.getStrategy(), bot.getFigi(),
+                context.getCandles().size(), context.getPositionQuantity());
+        TradingStrategy strategy = strategies.get(bot.getStrategy());
+        if (strategy == null) {
+            log.warn("Стратегия не найдена для бота {}: {}", bot.getId(), bot.getStrategy());
+            return TradeSignal.HOLD;
+        }
         try {
-            return switch (bot.getStrategy()) {
-                case MACD_CROSSOVER -> checkMacdCrossover(bot, prices);
-                case SMA_CROSSOVER -> checkSmaCrossover(bot, prices);
-                case VOLATILITY_BREAKOUT -> checkVolatilityBreakout(bot, prices);
-                case EMA_TREND -> checkEmaTrend(bot, prices);
-            };
+            TradeSignal signal = strategy.evaluate(bot, context);
+            log.info("Торговый сигнал: botId={}, strategy={}, figi={}, signal={}, candles.size={}",
+                    bot.getId(), bot.getStrategy(), bot.getFigi(), signal, context.getCandles().size());
+            return signal;
         } catch (Exception e) {
-            log.error("Ошибка при выполнении стратегии {} для бота {}: {}", bot.getStrategy(), bot.getId(), e.getMessage());
-            return false;
+            log.error("Ошибка при выполнении стратегии {} для бота {}: {}",
+                    bot.getStrategy(), bot.getId(), e.getMessage());
+            return TradeSignal.HOLD;
         }
-    }
-
-    private boolean checkMacdCrossover(TradingBot bot, List<PriceDataDto> prices) {
-        if (prices.size() < 26) {
-            return false;
-        }
-
-        AnalyticsRequestDto request = new AnalyticsRequestDto(bot.getFigi(), prices, null);
-        MacdResponseDto macd = analyticsServiceClient.calculateMACD(request);
-
-        // Покупка: MACD пересекает сигнальную линию снизу вверх
-        return macd.getHistogram().compareTo(BigDecimal.ZERO) > 0 && 
-               macd.getMacd().compareTo(macd.getSignal()) > 0;
-    }
-
-    private boolean checkSmaCrossover(TradingBot bot, List<PriceDataDto> prices) {
-        if (bot.getSmaPeriod() == null || prices.size() < bot.getSmaPeriod()) {
-            return false;
-        }
-
-        AnalyticsRequestDto request = new AnalyticsRequestDto(bot.getFigi(), prices, bot.getSmaPeriod());
-        SmaResponseDto sma = analyticsServiceClient.calculateSMA(request);
-        
-        BigDecimal currentPrice = prices.get(prices.size() - 1).getPrice();
-        
-        // Покупка: цена выше SMA
-        return currentPrice.compareTo(sma.getSma()) > 0;
-    }
-
-    private boolean checkVolatilityBreakout(TradingBot bot, List<PriceDataDto> prices) {
-        if (prices.size() < 20) {
-            return false;
-        }
-
-        AnalyticsRequestDto request = new AnalyticsRequestDto(bot.getFigi(), prices, 20);
-        VolatilityResponseDto volatility = analyticsServiceClient.calculateVolatility(request);
-
-        // Покупка при высокой волатильности (пробой)
-        return volatility.getVolatility().compareTo(BigDecimal.valueOf(5)) > 0;
-    }
-
-    private boolean checkEmaTrend(TradingBot bot, List<PriceDataDto> prices) {
-        if (bot.getEmaPeriod() == null || prices.size() < bot.getEmaPeriod()) {
-            return false;
-        }
-
-        AnalyticsRequestDto request = new AnalyticsRequestDto(bot.getFigi(), prices, bot.getEmaPeriod());
-        EmaResponseDto ema = analyticsServiceClient.calculateEMA(request);
-        
-        BigDecimal currentPrice = prices.get(prices.size() - 1).getPrice();
-        
-        // Покупка: цена выше EMA (восходящий тренд)
-        return currentPrice.compareTo(ema.getEma()) > 0;
     }
 }

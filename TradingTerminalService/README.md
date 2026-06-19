@@ -1,41 +1,53 @@
 # Trading Terminal Service
 
-Сервис торгового терминала для размещения и управления ордерами.
+Сервис торгового терминала: размещение и управление ордерами.
 
 ## Порт
-- **8006** - основной порт Trading Terminal Service
+
+- **8006** — основной порт Trading Terminal Service
 
 ## Функциональность
 
 ### Управление ордерами
 
-1. **Создание ордера**
-   - POST `/orders`
-   - Требует заголовок `X-User-Id`
-   - Поддерживает типы: BUY, SELL
+| Метод | Путь | Описание |
+|-------|------|----------|
+| POST | `/orders` | Создать ордер |
+| GET | `/orders` | Все ордера пользователя |
+| GET | `/orders/status/{status}` | Фильтр по статусу |
+| GET | `/orders/{orderId}` | Ордер по ID |
+| PATCH | `/orders/{orderId}` | Изменить параметры (amend, LIMIT PENDING) |
+| POST | `/orders/{orderId}/execute` | Исполнить ордер |
+| POST | `/orders/{orderId}/cancel` | Отменить ордер |
+| GET | `/orders/stats` | Статистика пользователя |
+| GET | `/orders/admin/stats/orders` | Глобальная статистика (админ) |
 
-2. **Получение ордеров пользователя**
-   - GET `/orders`
-   - GET `/orders/status/{status}` - фильтр по статусу
+Идентификатор пользователя — `X-User-Id` (через Gateway из JWT).
 
-3. **Управление ордером**
-   - GET `/orders/{orderId}` - получить ордер
-   - POST `/orders/{orderId}/execute` - исполнить ордер
-   - POST `/orders/{orderId}/cancel` - отменить ордер
+### Типы ордеров
 
-## Статусы ордеров
+- **Направление:** `BUY`, `SELL` (`OrderType`)
+- **Исполнение у брокера:** `MARKET`, `LIMIT`, `STOP` (`BrokerOrderType`, по умолчанию `LIMIT`)
+- **STOP:** поле `stopPrice` — цена активации стоп-заявки
 
-- `PENDING` - ожидает исполнения
-- `EXECUTED` - исполнен
-- `CANCELLED` - отменен
-- `REJECTED` - отклонен
+### Amend (изменение LIMIT)
 
-## Примеры использования
+`PATCH /orders/{orderId}` с телом `{"price": <новая цена>}` — только для ордеров в статусе `PENDING` с типом `LIMIT`.
 
-### Создание ордера на покупку
+### Статусы
+
+- `PENDING` — ожидает исполнения
+- `EXECUTED` — исполнен
+- `CANCELLED` — отменён
+- `REJECTED` — отклонён
+
+## Примеры через API Gateway
+
+### LIMIT-ордер на покупку
+
 ```bash
-POST http://localhost:8006/orders
-X-User-Id: user123
+POST http://localhost:8090/api/orders
+Authorization: Bearer <token>
 Content-Type: application/json
 
 {
@@ -43,22 +55,65 @@ Content-Type: application/json
   "type": "BUY",
   "quantity": 10,
   "price": 2500.50,
-  "comment": "Покупка по техническому анализу"
+  "orderType": "LIMIT",
+  "comment": "Покупка по лимиту"
 }
 ```
 
-### Получение всех ордеров
+### MARKET-ордер
+
 ```bash
-GET http://localhost:8006/orders
-X-User-Id: user123
+POST http://localhost:8090/api/orders
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "figi": "BBG004730N88",
+  "type": "BUY",
+  "quantity": 1,
+  "price": 100.00,
+  "orderType": "MARKET"
+}
 ```
 
-### Исполнение ордера
+### STOP-ордер
+
 ```bash
-POST http://localhost:8006/orders/{orderId}/execute
+POST http://localhost:8090/api/orders
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "figi": "BBG004730N88",
+  "type": "SELL",
+  "quantity": 5,
+  "price": 95.00,
+  "orderType": "STOP",
+  "stopPrice": 98.00
+}
+```
+
+### Amend LIMIT
+
+```bash
+PATCH http://localhost:8090/api/orders/{orderId}
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{"price": 2400.00}
+```
+
+### Отмена
+
+Только для ордеров в статусе `PENDING`. При `paper=true` — локальная отмена без вызова брокера. При live-ордере с `brokerOrderId` — сначала отмена у брокера; при ошибке брокера статус **не** меняется (HTTP 4xx/5xx).
+
+```bash
+POST http://localhost:8090/api/orders/{orderId}/cancel
+Authorization: Bearer <token>
 ```
 
 ## Health Check
+
 ```bash
 GET http://localhost:8006/actuator/health
 ```

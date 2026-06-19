@@ -17,7 +17,7 @@ import java.util.function.Function;
 public class JwtUtils {
 
     private static final String CLAIM_TYPE = "type";
-    private static final String TYPE_ACCESS = "access";
+    private static final String TYPE_REFRESH = "refresh";
 
     @Value("${jwt.secret}")
     private String secret;
@@ -61,11 +61,17 @@ public class JwtUtils {
         return extractExpiration(token).before(new Date());
     }
 
+    /**
+     * Согласовано с ApiGateway: refresh отклоняем; claim {@code type} без значения считаем access (совместимость).
+     */
     public boolean validateToken(String token) {
         try {
             Claims claims = extractAllClaims(token);
             Object type = claims.get(CLAIM_TYPE);
-            return TYPE_ACCESS.equals(type) && !isTokenExpired(token);
+            if (TYPE_REFRESH.equals(type)) {
+                return false;
+            }
+            return !isTokenExpired(token);
         } catch (Exception e) {
             return false;
         }

@@ -1,7 +1,10 @@
 package com.fs.service;
 
+import com.fs.domain.BrokerOrderType;
 import com.fs.domain.Order;
 import com.fs.domain.OrderStatus;
+import com.fs.dto.AmendBrokerOrderDto;
+import com.fs.dto.AmendOrderDto;
 import com.fs.dto.BrokerOrderDto;
 import com.fs.exception.OrderNotFoundException;
 import com.fs.dto.CreateBrokerOrderDto;
@@ -30,6 +33,8 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final BrokerIntegrationServiceClient brokerIntegrationServiceClient;
     private final UserServiceClient userServiceClient;
+    private final JournalFillPublisher journalFillPublisher;
+    private final PaperFillSimulator paperFillSimulator;
 
     /** Только для тестов/локальной разработки. В продакшене оставьте пустым — счёт берётся из UserService по userId (свой счёт для каждого пользователя). */
     @Value("${broker.default-account-id:}")
@@ -43,7 +48,8 @@ public class OrderService {
 
     @Transactional
     public OrderDto createOrder(String userId, CreateOrderDto createOrderDto) {
-        log.info("Создание ордера для пользователя: {}, FIGI: {}, тип: {}", userId, createOrderDto.getFigi(), createOrderDto.getType());
+        log.info("Создание ордера: userId={}, figi={}, type={}, brokerEnabled={}",
+                userId, createOrderDto.getFigi(), createOrderDto.getType(), brokerIntegrationEnabled);
         
         Long userIdLong = parseUserId(userId);
         
@@ -56,9 +62,20 @@ public class OrderService {
         order.setStatus(OrderStatus.PENDING);
         order.setCreatedAt(LocalDateTime.now());
         order.setComment(createOrderDto.getComment());
+        order.setOrderType(resolveBrokerOrderType(createOrderDto.getOrderType()));
+        order.setStopPrice(createOrderDto.getStopPrice());
+        order.setPaper(Boolean.TRUE.equals(createOrderDto.getPaper()));
 
         Order savedOrder = orderRepository.save(order);
-        log.info("Ордер создан с ID: {}", savedOrder.getId());
+        log.info("Ордер создан с ID: {}, paper={}", savedOrder.getId(), savedOrder.isPaper());
+
+        if (savedOrder.isPaper()) {
+            OrderStatus statusBefore = savedOrder.getStatus();
+            paperFillSimulator.applyPaperFill(savedOrder);
+            orderRepository.save(savedOrder);
+            publishFillIfNewlyExecuted(savedOrder, statusBefore);
+            return convertToDto(savedOrder);
+        }
         
         // Если включена интеграция с брокером, отправляем заявку на биржу
         if (brokerIntegrationEnabled) {
@@ -69,14 +86,14 @@ public class OrderService {
                 
                 // Обновляем статус заявки на основе ответа брокера
                 if (brokerOrder != null && brokerOrder.getOrderId() != null) {
-                    // Сохраняем ID заявки на бирже в комментарии (можно добавить отдельное поле)
-                    String brokerOrderId = brokerOrder.getOrderId();
-                    savedOrder.setComment(
-                        (savedOrder.getComment() != null ? savedOrder.getComment() + " | " : "") +
-                        "Broker Order ID: " + brokerOrderId
-                    );
+                    savedOrder.setBrokerOrderId(brokerOrder.getOrderId());
+                    savedOrder.setBrokerCode(defaultBrokerCode);
+                    OrderStatus statusBeforeBroker = savedOrder.getStatus();
+                    BrokerOrderStatusMapper.applyBrokerStatus(savedOrder, brokerOrder);
                     orderRepository.save(savedOrder);
-                    log.info("Заявка отправлена на биржу. Broker Order ID: {}", brokerOrderId);
+                    publishFillIfNewlyExecuted(savedOrder, statusBeforeBroker);
+                    log.info("Заявка отправлена на биржу. brokerOrderId={}, localStatus={}",
+                            brokerOrder.getOrderId(), savedOrder.getStatus());
                 } else {
                     log.warn("Брокерский сервис вернул пустой ответ или orderId отсутствует");
                 }
@@ -102,7 +119,9 @@ public class OrderService {
             brokerOrderDto.setQuantity(createOrderDto.getQuantity().longValue());
             brokerOrderDto.setPrice(createOrderDto.getPrice());
             brokerOrderDto.setDirection(createOrderDto.getType().name());
-            brokerOrderDto.setOrderType("LIMIT"); // По умолчанию лимитная заявка
+            BrokerOrderType brokerOrderType = resolveBrokerOrderType(createOrderDto.getOrderType());
+            brokerOrderDto.setOrderType(brokerOrderType.name());
+            brokerOrderDto.setStopPrice(createOrderDto.getStopPrice());
             brokerOrderDto.setComment(createOrderDto.getComment());
             
             log.debug("Вызов brokerIntegrationServiceClient.placeOrder с accountId: {}, FIGI: {}, quantity: {}, price: {}", 
@@ -168,18 +187,18 @@ public class OrderService {
         // Если включена интеграция с брокером, проверяем статус заявки на бирже
         if (brokerIntegrationEnabled) {
             try {
-                String brokerOrderId = extractBrokerOrderId(order.getComment());
+                String brokerOrderId = BrokerOrderIdResolver.resolve(order);
                 if (brokerOrderId != null) {
                     String accountId = getAccountIdForUser(String.valueOf(order.getUserId()));
                     BrokerOrderDto brokerOrder = brokerIntegrationServiceClient.getOrderStatus(accountId, brokerOrderId, null);
                     
-                    // Обновляем статус на основе статуса заявки на бирже
-                    if (brokerOrder != null && "FILL".equals(brokerOrder.getStatus())) {
-                        order.setStatus(OrderStatus.EXECUTED);
-                        order.setExecutedAt(LocalDateTime.now());
-                        log.info("Заявка на бирже исполнена. Broker Order ID: {}", brokerOrderId);
-                    } else {
-                        log.warn("Заявка на бирже еще не исполнена. Статус: {}", brokerOrder != null ? brokerOrder.getStatus() : "unknown");
+                    if (brokerOrder != null) {
+                        BrokerOrderStatusMapper.applyBrokerStatus(order, brokerOrder);
+                        if (order.getStatus() == OrderStatus.EXECUTED) {
+                            log.info("Заявка на бирже исполнена. brokerOrderId={}", brokerOrderId);
+                        } else {
+                            log.warn("Заявка на бирже еще не исполнена. Статус: {}", brokerOrder.getStatus());
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -194,30 +213,20 @@ public class OrderService {
         }
         
         Order savedOrder = orderRepository.save(order);
+        publishFillIfNewlyExecuted(savedOrder, OrderStatus.PENDING);
         log.info("Ордер исполнен: {}", orderId);
         
         return convertToDto(savedOrder);
     }
+
+    private void publishFillIfNewlyExecuted(Order order, OrderStatus previousStatus) {
+        if (order.getStatus() == OrderStatus.EXECUTED && previousStatus != OrderStatus.EXECUTED) {
+            journalFillPublisher.publishFill(order);
+        }
+    }
     
-    /**
-     * Извлечь ID заявки на бирже из комментария
-     */
-    private String extractBrokerOrderId(String comment) {
-        if (comment == null || comment.isEmpty()) {
-            return null;
-        }
-        String prefix = "Broker Order ID: ";
-        int index = comment.indexOf(prefix);
-        if (index != -1) {
-            String brokerOrderId = comment.substring(index + prefix.length()).trim();
-            // Убираем все после пробела или новой строки
-            int spaceIndex = brokerOrderId.indexOf(' ');
-            if (spaceIndex != -1) {
-                brokerOrderId = brokerOrderId.substring(0, spaceIndex);
-            }
-            return brokerOrderId;
-        }
-        return null;
+    private BrokerOrderType resolveBrokerOrderType(BrokerOrderType orderType) {
+        return orderType != null ? orderType : BrokerOrderType.LIMIT;
     }
 
     @Transactional
@@ -235,26 +244,85 @@ public class OrderService {
             throw new IllegalStateException("Невозможно отменить ордер. Текущий статус: " + order.getStatus());
         }
 
-        // Если включена интеграция с брокером, отменяем заявку на бирже
-        if (brokerIntegrationEnabled) {
-            try {
-                String brokerOrderId = extractBrokerOrderId(order.getComment());
-                if (brokerOrderId != null) {
-                    String accountId = getAccountIdForUser(String.valueOf(order.getUserId()));
-                    brokerIntegrationServiceClient.cancelOrder(accountId, brokerOrderId, null);
-                    log.info("Заявка отменена на бирже. Broker Order ID: {}", brokerOrderId);
+        if (order.isPaper()) {
+            order.setStatus(OrderStatus.CANCELLED);
+            order.setBrokerStatus("CANCELLED");
+        } else if (brokerIntegrationEnabled) {
+            String brokerOrderId = BrokerOrderIdResolver.resolve(order);
+            if (brokerOrderId != null) {
+                String accountId = getAccountIdForUser(String.valueOf(order.getUserId()));
+                String brokerCode = resolveBrokerCode(order);
+                brokerIntegrationServiceClient.cancelOrder(accountId, brokerOrderId, brokerCode);
+                BrokerOrderDto brokerOrder = brokerIntegrationServiceClient.getOrderStatus(
+                        accountId, brokerOrderId, brokerCode);
+                BrokerOrderStatusMapper.applyBrokerStatus(order, brokerOrder);
+                if (order.getStatus() == OrderStatus.PENDING) {
+                    throw new IllegalStateException("Брокер не подтвердил отмену заявки");
                 }
-            } catch (Exception e) {
-                log.error("Ошибка при отмене заявки на бирже: {}", e.getMessage(), e);
-                // Продолжаем отмену в системе даже если не удалось отменить на бирже
+                log.info("Заявка отменена на бирже. brokerOrderId={}", brokerOrderId);
+            } else {
+                order.setStatus(OrderStatus.CANCELLED);
+                order.setBrokerStatus("CANCELLED");
+            }
+        } else {
+            order.setStatus(OrderStatus.CANCELLED);
+            order.setBrokerStatus("CANCELLED");
+        }
+
+        Order savedOrder = orderRepository.save(order);
+        log.info("Ордер отменен: {}", orderId);
+
+        return convertToDto(savedOrder);
+    }
+
+    private String resolveBrokerCode(Order order) {
+        if (order.getBrokerCode() != null && !order.getBrokerCode().isBlank()) {
+            return order.getBrokerCode();
+        }
+        return defaultBrokerCode;
+    }
+
+    @Transactional
+    public OrderDto amendOrder(String orderId, String userId, AmendOrderDto amendOrderDto) {
+        log.info("Изменение ордера: {} для пользователя: {}", orderId, userId);
+        Long orderIdLong = parseOrderId(orderId);
+        Long userIdLong = parseUserId(userId);
+        Order order = orderRepository.findById(orderIdLong)
+                .orElseThrow(() -> new OrderNotFoundException("Ордер не найден"));
+        if (!order.getUserId().equals(userIdLong)) {
+            throw new OrderNotFoundException("Ордер не найден");
+        }
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new IllegalStateException(
+                    "Невозможно изменить ордер. Текущий статус: " + order.getStatus());
+        }
+        BrokerOrderType orderType = resolveBrokerOrderType(order.getOrderType());
+        if (orderType != BrokerOrderType.LIMIT) {
+            throw new IllegalStateException("Изменение цены поддерживается только для LIMIT-заявок");
+        }
+
+        order.setPrice(amendOrderDto.getPrice());
+
+        if (brokerIntegrationEnabled) {
+            String brokerOrderId = BrokerOrderIdResolver.resolve(order);
+            if (brokerOrderId != null) {
+                String accountId = getAccountIdForUser(userId);
+                AmendBrokerOrderDto brokerAmend = new AmendBrokerOrderDto(amendOrderDto.getPrice(), null);
+                BrokerOrderDto brokerOrder = brokerIntegrationServiceClient.amendOrder(
+                        accountId, brokerOrderId, brokerAmend, null);
+                if (brokerOrder != null) {
+                    if (brokerOrder.getPrice() != null) {
+                        order.setPrice(brokerOrder.getPrice());
+                    }
+                    if (brokerOrder.getStatus() != null) {
+                        order.setBrokerStatus(brokerOrder.getStatus());
+                    }
+                }
             }
         }
 
-        order.setStatus(OrderStatus.CANCELLED);
-        
         Order savedOrder = orderRepository.save(order);
-        log.info("Ордер отменен: {}", orderId);
-        
+        log.info("Ордер изменён: {}", orderId);
         return convertToDto(savedOrder);
     }
 
@@ -328,7 +396,13 @@ public class OrderService {
                 order.getStatus(),
                 order.getCreatedAt(),
                 order.getExecutedAt(),
-                order.getComment()
+                order.getComment(),
+                order.getBrokerOrderId(),
+                order.getBrokerCode(),
+                order.getOrderType(),
+                order.getStopPrice(),
+                order.getBrokerStatus(),
+                order.isPaper()
         );
     }
 }

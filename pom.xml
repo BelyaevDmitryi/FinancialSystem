@@ -11,6 +11,7 @@
     <packaging>pom</packaging>
 
     <modules>
+        <module>fs-trading-core</module>
         <module>EurekaServer</module>
         <module>ApiGateway</module>
         <module>BrokerIntegrationService</module>
@@ -23,5 +24,6 @@
         <module>DashboardService</module>
         <module>MarketHistoryService</module>
         <module>BotOptimizationService</module>
+        <module>JournalService</module>
     </modules>
 </project>

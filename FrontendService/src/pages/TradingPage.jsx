@@ -42,6 +42,7 @@ const TradingPage = () => {
     orderType: 'BUY',
     price: '',
   })
+  const [cancellingOrderId, setCancellingOrderId] = useState(null)
 
   useEffect(() => {
     if (user?.id) {
@@ -119,6 +120,26 @@ const TradingPage = () => {
       
       setError(errorMessage)
       console.error('Ошибка при создании ордера:', err)
+    }
+  }
+
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm('Отменить заявку?')) {
+      return
+    }
+    try {
+      setCancellingOrderId(orderId)
+      setError('')
+      await api.post(`/api/orders/${orderId}/cancel`)
+      await fetchOrders()
+    } catch (err) {
+      const errorMessage = err.response?.data?.message ||
+        err.response?.data?.error ||
+        'Не удалось отменить ордер'
+      setError(errorMessage)
+      console.error('Ошибка при отмене ордера:', err)
+    } finally {
+      setCancellingOrderId(null)
     }
   }
 
@@ -221,12 +242,13 @@ const TradingPage = () => {
               <TableCell>Цена</TableCell>
               <TableCell>Статус</TableCell>
               <TableCell>Дата создания</TableCell>
+              <TableCell align="right">Действия</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {orders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={7} align="center">
                   <Typography color="textSecondary">
                     Нет ордеров
                   </Typography>
@@ -248,6 +270,19 @@ const TradingPage = () => {
                   </TableCell>
                   <TableCell>
                     {order.createdAt ? new Date(order.createdAt).toLocaleString('ru-RU') : 'N/A'}
+                  </TableCell>
+                  <TableCell align="right">
+                    {order.status === 'PENDING' && (
+                      <Button
+                        size="small"
+                        color="warning"
+                        variant="outlined"
+                        disabled={cancellingOrderId === order.id}
+                        onClick={() => handleCancelOrder(order.id)}
+                      >
+                        {cancellingOrderId === order.id ? 'Отмена…' : 'Отменить'}
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

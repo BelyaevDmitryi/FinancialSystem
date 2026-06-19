@@ -1,50 +1,70 @@
-= Введение
+= FinancialSystem
 
 == Оглавление
 
 * <<_идея>>
-* <<_схема_проекта_и_сценарий_использования>>
-* <<_frontend,Frontend>>
+* <<_стек_и_инфраструктура>>
+* <<_архитектура_сервисов>>
+* <<_сценарий_использования>>
+* <<_документация_и_дорожная_карта>>
 * link:docs/SECURITY_AND_TOKENS.adoc[Безопасность и токены (продакшен)]
 
 == Идея
 
-Сделать систему, которая запрашивает данные по портфелю пользователя и выдает графики для его анализа.
+Микросервисная платформа для анализа портфеля, торговых роботов и стратегий на российском рынке (Т-Инвестиции и др.). Пользователь проходит аутентификацию через API Gateway, управляет портфелем и ботами, получает котировки, индикаторы, журнал сделок; для офлайн-анализа доступны исторические свечи, бэктест и grid-оптимизация параметров.
 
-Стек технологий: Spring Data, Spring MVC, Spring Security, Mongo DB, Docker, Unit test
+== Стек и инфраструктура
 
-== Схема проекта и сценарий использования
+* **Backend:** Java 17, Spring Boot 3, Spring Cloud (Eureka, Gateway), OpenFeign, Spring Security + JWT
+* **Хранение:** **PostgreSQL** (отдельные БД/схемы по сервисам), **Redis** (кэш цен в PriceService)
+* **Сборка:** Maven (обёртки `mvnw` в репозитории нет)
+* **Контейнеризация:** Docker Compose (`docker-compose.yml`, тестовые профили — см. link:DEVELOPER.md[DEVELOPER.md])
+* **Миграции БД:** Flyway (где подключено в модуле)
+* **API:** REST через Gateway `:8090`, OpenAPI (springdoc) по сервисам
 
-image:Scheme.PNG[Scheme.PNG]
+== Архитектура сервисов
 
-*Предполагаемый сценарий использования:* с UI в User service приходит запрос получить стоимость портфеля.
-По UserID, идем в БД - получаем ценные бумаги. User service =&gt; Stock service =&gt; Tinkoff service =&gt; Tinkoff API (запрашиваем цену по всем бумагам).
-Tinkoff отвечает возвращаем в Stock service. Если у части бумаг нет цены, то идем в Moex stock service =&gt; MOEX API. Если нашли цены бумаг возвращаемся в Stock service. Всю информацию передаем в User service. User service выполняет 2-ой запрос, чтобы избежать цикличности цену будем запрашивать в Price service (где то кеширует цену бумаг, возможно в Redis). По итогу: выводим стоимость портфеля и рисуем графики (как пример, круговая диаграмма сколько средств вложено: в акции/облигации, какие компании имеют большую долю в портфеле).
+Все модули перечислены в корневом `pom.xml`. Внешний клиент обращается только к **API Gateway**; сервисы регистрируются в **Eureka Server**.
 
-В системе должно быть удобным создание пользователя с портфелем акций.
-По тикеру система ходит на внешние API получает информацию. Она должна понимать валюту ценной бумаги, название компании, тип и тд. Пример ожидаемого json в ответ:
+| Сервис | Назначение |
+|--------|------------|
+| ApiGateway | Единая точка входа, маршрутизация `/api/**`, JWT |
+| EurekaServer | Service discovery |
+| UserService | Пользователи, аутентификация, портфель |
+| PriceService | Актуальные цены, Redis-кэш |
+| BrokerIntegrationService | Адаптеры брокера (TINKOFF, MOCK в тесте) |
+| AnalyticsService | SMA, EMA, MACD, волатильность |
+| TradingTerminalService | Ордера, исполнение через брокера |
+| TradingBotService | Торговые роботы, scheduler стратегий |
+| JournalService | Журнал сделок и позиций |
+| MarketHistoryService | Хранение и импорт OHLCV-свечей |
+| BotOptimizationService | Бэктест (`/api/backtest/**`) и grid-оптимизация |
+| AdminPanelService | Админ-статистика |
+| DashboardService | Данные дашборда |
 
-[,json]
-----
-{
-  "id": "somestring",
-  "ticker": "YNDX",
-  "currency": "RUB",
-  "name": "Yandex",
-  "type": "Stock",
-  "input": "Tinkoff"
-}
-----
+Диаграммы: link:docs/architecture/c4-containers-financialsystem.puml[C4 контейнеры], link:docs/architecture/c4-comparison-osengine-vs-financialsystem.puml[сравнение с OsEngine].
 
-Из-за отсутствия корпоративных бумаг в Tinkoff Инвестиции или других источниках важно предусмотреть, чтобы внешних ресурсов получения ценных бумаг должно быть несколько: Tinkoff Инвестиции, MOEX, Сбер Инвестиции и тд.
+== Сценарий использования
 
-Для сокращения времени получения информации по ценным бумагам хранение информации о них и пользователях должно быть в БД (MongoDB?).
-*Цена бумаг для аналитики должна быть актуальной!* Предусмотреть кеширование цены на несколько секунд или минут для установления цены, чтобы не бегать на биржу по каждой акции. Насколько кешировать устанавливается параметром.
+. Пользователь регистрируется / входит через Gateway (`POST /api/auth/signin`), получает JWT.
+. Запрашивает портфель и котировки: UserService → PriceService (кэш Redis) → при необходимости BrokerIntegrationService → API брокера.
+. Создаёт ордер через TradingTerminalService (`POST /api/orders`); исполнение идёт через брокерский адаптер; JournalService фиксирует сделки.
+. Создаёт торгового бота (`POST /api/bots`): TradingBotService по расписанию запрашивает AnalyticsService и PriceService, при сигнале создаёт ордер в терминале.
+. Для офлайн-анализа: импорт свечей в MarketHistoryService, прогон бэктеста и оптимизации параметров через BotOptimizationService.
+
+Тестовый стек без реального Tinkoff API, health-check и curl-примеры — в link:DEVELOPER.md[DEVELOPER.md].
+
+== Документация и дорожная карта
+
+* link:DEVELOPER.md[DEVELOPER.md] — сборка, порты, тестовая среда, E2E-сценарии
+* link:AGENTS.md[AGENTS.md] — соглашения для разработчиков и ИИ-агентов
+* link:docs/OS_ENGINE_TRANSFORMATION_ALGORITHM.md[Алгоритм трансформации OsEngine] — фазы A–F, соответствие подсистем
+* link:.cursor/plans/EPIC-OSE-000-osengine-parity-roadmap.plan.md[EPIC-OSE-000: дорожная карта паритета OsEngine] — закрытие пробелов FS ↔ OsEngine
 
 == FRONTEND
-Подойдет один из вариантов:
 
-. Консоль
-. Swagger
-. Телеграм бот.
-. Web интерфейс.
+Подойдёт один из вариантов:
+
+. Консоль / curl через Gateway
+. Swagger (springdoc по сервисам)
+. Web-интерфейс (в разработке; см. EPIC-OSE-000)

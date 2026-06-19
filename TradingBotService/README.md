@@ -1,40 +1,43 @@
 # Trading Bot Service
 
-Сервис для автоматической торговли на основе технического анализа.
+Сервис автоматической торговли на основе технического анализа.
 
 ## Порт
-- **8007** - основной порт Trading Bot Service
+
+- **8007** — основной порт Trading Bot Service
 
 ## Функциональность
 
 ### Управление ботами
 
-1. **Создание бота**
-   - POST `/bots`
-   - Требует заголовок `X-User-Id`
-   - Поддерживает стратегии: MACD_CROSSOVER, SMA_CROSSOVER, VOLATILITY_BREAKOUT, EMA_TREND
+| Метод | Путь | Описание |
+|-------|------|----------|
+| POST | `/bots` | Создать бота |
+| GET | `/bots` | Список ботов пользователя |
+| PUT | `/bots/{botId}/status` | Изменить статус (`?status=ACTIVE\|PAUSED\|...`) |
+| DELETE | `/bots/{botId}` | Удалить бота |
+| GET | `/bots/admin/stats/bots` | Статистика ботов (админ) |
 
-2. **Управление ботами**
-   - GET `/bots` - получить все боты пользователя
-   - PUT `/bots/{botId}/status` - изменить статус бота
+Идентификатор пользователя — заголовок `X-User-Id` (Gateway выставляет из JWT).
 
-### Стратегии торговли
+### Стратегии
 
-- **MACD_CROSSOVER** - покупка при пересечении MACD сигнальной линии
-- **SMA_CROSSOVER** - покупка когда цена выше SMA
-- **VOLATILITY_BREAKOUT** - покупка при высокой волатильности
-- **EMA_TREND** - покупка при восходящем тренде по EMA
+- **MACD_CROSSOVER** — пересечение MACD и сигнальной линии
+- **SMA_CROSSOVER** — цена выше SMA
+- **VOLATILITY_BREAKOUT** — пробой по волатильности
+- **EMA_TREND** — восходящий тренд по EMA
 
-### Автоматическое выполнение
+### Планировщик
 
-Боты автоматически выполняются каждую минуту (настраивается через `bot.scheduler.fixed-delay`).
+Боты выполняются по расписанию (`bot.scheduler.fixed-delay`, по умолчанию каждую минуту). Scheduler использует S2S JWT (`X-Gateway-Internal-Jwt`) при вызовах Trading Terminal.
 
-## Примеры использования
+## Примеры через API Gateway
 
-### Создание бота с MACD стратегией
+### Создание бота
+
 ```bash
-POST http://localhost:8007/bots
-X-User-Id: user123
+POST http://localhost:8090/api/bots
+Authorization: Bearer <token>
 Content-Type: application/json
 
 {
@@ -47,12 +50,22 @@ Content-Type: application/json
 }
 ```
 
-### Изменение статуса бота
+### Изменение статуса
+
 ```bash
-PUT http://localhost:8007/bots/{botId}/status?status=PAUSED
+PUT http://localhost:8090/api/bots/{botId}/status?status=PAUSED
+Authorization: Bearer <token>
+```
+
+### Удаление бота
+
+```bash
+DELETE http://localhost:8090/api/bots/{botId}
+Authorization: Bearer <token>
 ```
 
 ## Health Check
+
 ```bash
 GET http://localhost:8007/actuator/health
 ```

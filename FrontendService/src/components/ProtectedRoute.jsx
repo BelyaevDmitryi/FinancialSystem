@@ -5,6 +5,8 @@ import { CircularProgress, Box } from '@mui/material'
 
 const ProtectedRoute = ({ children }) => {
   const { token, loading } = useAuth()
+  const storedToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+  const effectiveToken = token || storedToken
 
   if (loading) {
     return (
@@ -19,7 +21,7 @@ const ProtectedRoute = ({ children }) => {
     )
   }
 
-  if (!token) {
+  if (!effectiveToken) {
     return <Navigate to="/login" replace />
   }
 

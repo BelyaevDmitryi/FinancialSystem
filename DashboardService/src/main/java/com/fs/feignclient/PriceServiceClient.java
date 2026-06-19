@@ -12,4 +12,7 @@ public interface PriceServiceClient {
 
     @GetMapping("/prices")
     List<PriceDataDto> getPrices(@RequestParam("figies") List<String> figies);
+
+    @GetMapping("/prices/snapshot")
+    List<PriceDataDto> getSnapshotPrices(@RequestParam("figies") List<String> figies);
 }

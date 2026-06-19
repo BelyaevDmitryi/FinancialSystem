@@ -38,6 +38,13 @@ public class PriceController {
         return priceService.getPricesByFigies(figies);
     }
 
+    @GetMapping("/prices/snapshot")
+    @Operation(summary = "Получить EOD snapshot цены из Redis-кэша")
+    public List<PriceDataDto> getSnapshotPricesByFigies(@RequestParam("figies") List<String> figies) {
+        log.info("Getting snapshot prices for figies: {}", figies);
+        return priceService.getSnapshotPricesByFigies(figies);
+    }
+
     @PostMapping("/add")
     @Operation(summary = "Добавить цену в кеш")
     public FigiWithPrice addStock(@RequestBody FigiWithPrice figiWithPrice) {

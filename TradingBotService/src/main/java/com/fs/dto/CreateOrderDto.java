@@ -16,4 +16,10 @@ public class CreateOrderDto {
     private BigDecimal quantity;
     private BigDecimal price;
     private String comment;
+
+    /** Тип исполнения у брокера: MARKET, LIMIT, STOP (P0 default — MARKET). */
+    private String orderType;
+
+    /** Paper-режим: симуляция fill в Terminal без брокера. */
+    private Boolean paper;
 }

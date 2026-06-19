@@ -93,29 +93,63 @@ public class StockPriceService {
 
     private List<StockWithPrice> getPricesFromApi(List<Stock> notFoundInRepo) {
         long start = System.currentTimeMillis();
-        // Получаем FIGI из акций
         List<String> figies = notFoundInRepo.stream()
                 .map(Stock::getFigi)
                 .toList();
-        
-        // Запрашиваем цены через BrokerIntegrationService
+
         FigiesDto figiesDto = new FigiesDto(figies);
         StocksPricesDto stocksPricesDto = stockServiceClient.getPrices(figiesDto);
-        
-        // Преобразуем результат в StockWithPrice
+
         Map<String, BigDecimal> priceMap = stocksPricesDto.getPrices().stream()
                 .collect(Collectors.toMap(
                         StockPrice::getFigi,
                         StockPrice::getPrice
                 ));
-        
+
+        Map<String, String> priceSourceByFigi = new java.util.HashMap<>();
+        stocksPricesDto.getPrices().forEach(stockPrice ->
+                priceSourceByFigi.put(stockPrice.getFigi(), "TINKOFF"));
+
+        List<Stock> missingAfterTinkoff = notFoundInRepo.stream()
+                .filter(stock -> !priceMap.containsKey(stock.getFigi()))
+                .toList();
+
+        if (!missingAfterTinkoff.isEmpty()) {
+            applyMoexPriceFallback(missingAfterTinkoff, priceMap, priceSourceByFigi);
+        }
+
         List<StockWithPrice> result = notFoundInRepo.stream()
                 .filter(stock -> priceMap.containsKey(stock.getFigi()))
-                .map(stock -> new StockWithPrice(stock, priceMap.get(stock.getFigi())))
+                .map(stock -> new StockWithPrice(
+                        stock,
+                        priceMap.get(stock.getFigi()),
+                        priceSourceByFigi.getOrDefault(stock.getFigi(), stock.getSource())))
                 .toList();
-        
+
         log.info("Time for getting from API - {}", System.currentTimeMillis() - start);
         return result;
+    }
+
+    private void applyMoexPriceFallback(List<Stock> missingStocks,
+            Map<String, BigDecimal> priceMap,
+            Map<String, String> priceSourceByFigi) {
+        List<String> moexFigies = missingStocks.stream()
+                .map(stock -> "MOEX:" + stock.getTicker().toUpperCase())
+                .toList();
+        Map<String, String> moexFigiToOriginal = missingStocks.stream()
+                .collect(Collectors.toMap(
+                        stock -> "MOEX:" + stock.getTicker().toUpperCase(),
+                        Stock::getFigi,
+                        (left, right) -> left));
+
+        StocksPricesDto moexPrices = stockServiceClient.getPrices(new FigiesDto(moexFigies), "MOEX_ISS");
+        moexPrices.getPrices().forEach(stockPrice -> {
+            String originalFigi = moexFigiToOriginal.get(stockPrice.getFigi());
+            if (originalFigi != null) {
+                priceMap.put(originalFigi, stockPrice.getPrice());
+                priceSourceByFigi.put(originalFigi, "MOEX_ISS");
+            }
+        });
     }
     
     /**
@@ -162,6 +196,19 @@ public class StockPriceService {
         
         log.info("Time for getting prices by figies - {} ms", System.currentTimeMillis() - start);
         return result;
+    }
+
+    public List<PriceDataDto> getSnapshotPricesByFigies(List<String> figies) {
+        if (figies == null || figies.isEmpty()) {
+            return List.of();
+        }
+
+        return stockRepository.findAllById(figies).stream()
+                .map(fwp -> new PriceDataDto(
+                        fwp.getFigi(),
+                        fwp.getPrice(),
+                        java.time.LocalDateTime.now()))
+                .toList();
     }
 
     private void checkAllOk(List<Stock> inputStocks, List<StockWithPrice> result) {

@@ -5,10 +5,12 @@ import com.fs.service.BrokerAccountService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,6 +19,7 @@ import java.util.List;
 @RequestMapping("/api/profile/broker-accounts")
 @RequiredArgsConstructor
 @Slf4j
+@Validated
 @Tag(name = "Broker Accounts", description = "Привязка счетов пользователя у брокеров")
 public class BrokerAccountController {
 
@@ -33,6 +36,13 @@ public class BrokerAccountController {
     public ResponseEntity<List<UserBrokerAccountDto>> getMyAccounts(
             @RequestHeader("X-User-Id") String userId) {
         return ResponseEntity.ok(brokerAccountService.getUserBrokerAccounts(userId));
+    }
+
+    @PostMapping("/discover")
+    @Operation(summary = "Список счетов по API-токену (без сохранения токена)")
+    public ResponseEntity<List<DiscoveredBrokerAccountDto>> discoverAccounts(
+            @Valid @RequestBody DiscoverBrokerAccountsRequestDto dto) {
+        return ResponseEntity.ok(brokerAccountService.discoverAccounts(dto));
     }
 
     @GetMapping("/default")
@@ -53,8 +63,29 @@ public class BrokerAccountController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
+    @PutMapping("/external")
+    @Operation(summary = "Обновить счёт по брокеру и внешнему идентификатору")
+    public ResponseEntity<UserBrokerAccountDto> updateAccountByExternalIds(
+            @RequestHeader("X-User-Id") String userId,
+            @RequestParam @NotBlank(message = "Код брокера обязателен") String brokerCode,
+            @RequestParam @NotBlank(message = "Идентификатор счёта обязателен") String externalAccountId,
+            @RequestBody UpdateUserBrokerAccountDto dto) {
+        return ResponseEntity.ok(brokerAccountService.updateAccountByExternalIds(
+                userId, brokerCode, externalAccountId, dto));
+    }
+
+    @DeleteMapping("/external")
+    @Operation(summary = "Отвязать счёт по брокеру и внешнему идентификатору")
+    public ResponseEntity<Void> deleteAccountByExternalIds(
+            @RequestHeader("X-User-Id") String userId,
+            @RequestParam @NotBlank(message = "Код брокера обязателен") String brokerCode,
+            @RequestParam @NotBlank(message = "Идентификатор счёта обязателен") String externalAccountId) {
+        brokerAccountService.deleteAccountByExternalIds(userId, brokerCode, externalAccountId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/{id}")
-    @Operation(summary = "Обновить счёт (название, счёт по умолчанию)")
+    @Operation(summary = "Обновить счёт (название, счёт по умолчанию), по числовому id привязки")
     public ResponseEntity<UserBrokerAccountDto> updateAccount(
             @RequestHeader("X-User-Id") String userId,
             @PathVariable Long id,
@@ -63,7 +94,7 @@ public class BrokerAccountController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Отвязать счёт")
+    @Operation(summary = "Отвязать счёт по числовому id привязки")
     public ResponseEntity<Void> deleteAccount(
             @RequestHeader("X-User-Id") String userId,
             @PathVariable Long id) {

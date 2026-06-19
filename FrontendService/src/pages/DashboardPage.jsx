@@ -8,6 +8,8 @@ import {
   CardContent,
   CircularProgress,
   Alert,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import api from '../services/api'
@@ -15,22 +17,40 @@ import { useAuth } from '../context/AuthContext'
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8']
 
+const CLASS_LABELS = {
+  BOND_TYPE: 'Облигации',
+  SHARE_TYPE_COMMON: 'Акции',
+  ETF_TYPE: 'ETF',
+}
+
+function resolveClassLabel(classActive) {
+  if (!classActive) {
+    return 'Прочее'
+  }
+  const key = typeof classActive === 'string' ? classActive : classActive.value ?? String(classActive)
+  return CLASS_LABELS[key] ?? key
+}
+
 const DashboardPage = () => {
-  const { user } = useAuth()
+  const { token, user } = useAuth()
   const [dashboard, setDashboard] = useState(null)
+  const [classStats, setClassStats] = useState(null)
+  const [pieMode, setPieMode] = useState('positions')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (user?.id) {
-      fetchDashboard()
+    const accessToken = token || localStorage.getItem('token')
+    if (!accessToken) {
+      setLoading(false)
+      return
     }
-  }, [user])
+    fetchDashboard()
+  }, [token])
 
   const fetchDashboard = async () => {
     try {
       setLoading(true)
-      // X-User-Id добавляется автоматически ApiGateway после валидации JWT
       const response = await api.get('/api/dashboard')
       setDashboard(response.data)
       setError('')
@@ -39,6 +59,31 @@ const DashboardPage = () => {
       console.error(err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchClassStats = async () => {
+    if (!user?.id) {
+      return
+    }
+    try {
+      const response = await api.get(`/api/statistic/classes/${user.id}`)
+      setClassStats(response.data)
+    } catch (err) {
+      console.error(err)
+      setClassStats(null)
+    }
+  }
+
+  useEffect(() => {
+    if (pieMode === 'classes' && user?.id) {
+      fetchClassStats()
+    }
+  }, [pieMode, user?.id])
+
+  const handlePieModeChange = (_, nextMode) => {
+    if (nextMode) {
+      setPieMode(nextMode)
     }
   }
 
@@ -58,10 +103,19 @@ const DashboardPage = () => {
     return <Alert severity="info">Нет данных для отображения</Alert>
   }
 
-  const portfolioData = dashboard.portfolioDistribution?.map((item, index) => ({
-    name: item.name || `Актив ${index + 1}`,
-    value: item.value || 0,
-  })) || []
+  const positionsPieData =
+    dashboard.portfolioDistribution?.map((item, index) => ({
+      name: item.name || `Актив ${index + 1}`,
+      value: item.value || 0,
+    })) || []
+
+  const classesPieData =
+    classStats?.classes?.map((item) => ({
+      name: resolveClassLabel(item.classActive),
+      value: item.value || 0,
+    })) || []
+
+  const portfolioData = pieMode === 'classes' ? classesPieData : positionsPieData
 
   return (
     <Box>
@@ -90,9 +144,7 @@ const DashboardPage = () => {
               <Typography color="textSecondary" gutterBottom>
                 Количество позиций
               </Typography>
-              <Typography variant="h4">
-                {dashboard.positionsCount || 0}
-              </Typography>
+              <Typography variant="h4">{dashboard.positionsCount || 0}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -116,9 +168,27 @@ const DashboardPage = () => {
         </Grid>
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Распределение портфеля
-            </Typography>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 2,
+                flexWrap: 'wrap',
+                gap: 1,
+              }}
+            >
+              <Typography variant="h6">Распределение портфеля</Typography>
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={pieMode}
+                onChange={handlePieModeChange}
+              >
+                <ToggleButton value="positions">По позициям</ToggleButton>
+                <ToggleButton value="classes">По классам активов</ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
             {portfolioData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
@@ -127,18 +197,13 @@ const DashboardPage = () => {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }) =>
-                      `${name}: ${(percent * 100).toFixed(0)}%`
-                    }
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
                   >
                     {portfolioData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                      />
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -147,7 +212,9 @@ const DashboardPage = () => {
               </ResponsiveContainer>
             ) : (
               <Typography color="textSecondary" align="center" sx={{ mt: 4 }}>
-                Нет данных для графика
+                {pieMode === 'classes'
+                  ? 'Нет данных по классам активов'
+                  : 'Нет данных для графика'}
               </Typography>
             )}
           </Paper>

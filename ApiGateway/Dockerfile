@@ -14,6 +14,7 @@ RUN mvn clean package -DskipTests
 
 # Копирование jar-файла в нужное место
 FROM bellsoft/liberica-openjdk-alpine-musl:17
+RUN apk add --no-cache curl
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8090

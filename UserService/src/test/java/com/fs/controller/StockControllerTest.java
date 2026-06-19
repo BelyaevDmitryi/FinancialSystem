@@ -3,6 +3,7 @@ package com.fs.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fs.config.TestConfig;
 import com.fs.dto.LoginRequestDto;
+import org.junit.jupiter.api.Disabled;
 import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Disabled("Requires seeded database with 'admin'/'admin123' and pre-created 'testuser'; use docker-compose.test.yml")
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(TestConfig.class)

@@ -29,7 +29,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @EnableAutoConfiguration(exclude = SecurityAutoConfiguration.class)
 @TestPropertySource(properties = {
         "eureka.client.enabled=false",
-        "spring.cloud.config.enabled=false"
+        "spring.cloud.config.enabled=false",
+        "spring.cloud.client.hostname=localhost",
+        "spring.cloud.client.ip-address=127.0.0.1"
 })
 @DisplayName("AnalyticsController")
 class AnalyticsControllerTest {

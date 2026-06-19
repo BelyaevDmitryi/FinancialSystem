@@ -5,6 +5,7 @@ import com.fs.dto.StocksDto;
 import com.fs.dto.StocksPricesDto;
 import com.fs.dto.TickersDto;
 import com.fs.dto.BrokerOrderDto;
+import com.fs.dto.AmendBrokerOrderDto;
 import com.fs.dto.CreateBrokerOrderDto;
 import com.fs.dto.OrderBookDto;
 import com.fs.dto.BrokerCandleDto;
@@ -61,6 +62,11 @@ public interface BrokerAdapter {
      * @param orderId ID заявки на бирже
      */
     void cancelOrder(String accountId, String orderId);
+
+    /**
+     * Изменить параметры активной заявки (цена, количество).
+     */
+    BrokerOrderDto amendOrder(String accountId, String orderId, AmendBrokerOrderDto amendDto);
     
     /**
      * Получить статус заявки

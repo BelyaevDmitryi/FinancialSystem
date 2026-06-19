@@ -1,5 +1,6 @@
 package com.fs.feignclient;
 
+import com.fs.dto.AmendBrokerOrderDto;
 import com.fs.dto.BrokerOrderDto;
 import com.fs.dto.CreateBrokerOrderDto;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -20,6 +21,14 @@ public interface BrokerIntegrationServiceClient {
             @RequestParam(required = false) String broker
     );
     
+    @PatchMapping("/broker/orders/{orderId}")
+    BrokerOrderDto amendOrder(
+            @RequestHeader("X-Account-Id") String accountId,
+            @PathVariable String orderId,
+            @RequestBody AmendBrokerOrderDto amendDto,
+            @RequestParam(required = false) String broker
+    );
+
     @PostMapping("/broker/orders/{orderId}/cancel")
     void cancelOrder(
             @RequestHeader("X-Account-Id") String accountId,

@@ -28,4 +28,5 @@ public class BotDto {
     private LocalDateTime lastExecution;
     private Integer totalTrades;
     private BigDecimal totalProfit;
+    private boolean paper;
 }

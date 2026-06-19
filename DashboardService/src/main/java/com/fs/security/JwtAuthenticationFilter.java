@@ -23,6 +23,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
+    /** См. ApiGateway: сырой JWT после проверки на шлюзе (Authorization до сервиса не всегда доходит). */
+    private static final String GATEWAY_INTERNAL_JWT_HEADER = "X-Gateway-Internal-Jwt";
+
     private final JwtUtils jwtUtils;
 
     public JwtAuthenticationFilter(JwtUtils jwtUtils) {
@@ -30,19 +33,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.startsWith("/actuator/") || path.startsWith("/api-docs") || path.startsWith("/swagger-ui");
+    }
+
+    @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        String token = parseJwt(request);
+        if (token == null) {
+            log.warn("JWT токен отсутствует для пути: {}", request.getRequestURI());
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"message\":\"JWT токен отсутствует\"}");
+            return;
+        }
+
         try {
-            String token = parseJwt(request);
-
-            if (token == null) {
-                log.warn("JWT токен отсутствует для пути: {}", request.getRequestURI());
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.setContentType("application/json");
-                response.getWriter().write("{\"message\":\"JWT токен отсутствует\"}");
-                return;
-            }
-
             if (!jwtUtils.validateToken(token)) {
                 log.warn("Невалидный или истёкший JWT токен для пути: {}", request.getRequestURI());
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -50,7 +58,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 response.getWriter().write("{\"message\":\"Невалидный или истёкший JWT токен\"}");
                 return;
             }
-
             String userId = jwtUtils.extractUserId(token);
             var authorities = jwtUtils.extractRoles(token).stream()
                     .map(SimpleGrantedAuthority::new)
@@ -61,20 +68,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             authorities.isEmpty() ? Collections.emptyList() : authorities);
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authentication);
-
-            filterChain.doFilter(request, response);
         } catch (Exception e) {
             log.error("Ошибка при проверке JWT: {}", e.getMessage());
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             response.getWriter().write("{\"message\":\"Ошибка при проверке JWT\"}");
+            return;
         }
+
+        filterChain.doFilter(request, response);
     }
 
     private String parseJwt(HttpServletRequest request) {
+        String internal = request.getHeader(GATEWAY_INTERNAL_JWT_HEADER);
+        if (StringUtils.hasText(internal)) {
+            return internal.trim();
+        }
         String headerAuth = request.getHeader("Authorization");
         if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
-            return headerAuth.substring(7);
+            return headerAuth.substring(7).trim();
         }
         return null;
     }

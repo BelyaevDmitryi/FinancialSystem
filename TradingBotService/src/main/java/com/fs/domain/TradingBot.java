@@ -47,4 +47,7 @@ public class TradingBot {
     private LocalDateTime lastExecution;
     private Integer totalTrades = 0;
     private BigDecimal totalProfit = BigDecimal.ZERO;
+
+    @Column(nullable = false)
+    private boolean paper = true;
 }

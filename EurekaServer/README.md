@@ -3,32 +3,46 @@
 Service Discovery сервер для микросервисной архитектуры финансовой системы.
 
 ## Порт
-- **8761** - основной порт Eureka Server
+
+- **8761** — основной порт Eureka Server
 
 ## Веб-интерфейс
-После запуска Eureka Server доступен веб-интерфейс для мониторинга зарегистрированных сервисов:
+
+После запуска доступен мониторинг зарегистрированных сервисов:
+
 - http://localhost:8761
 
-## Зарегистрированные сервисы
+## Модули Maven (корневой `pom.xml`)
 
-Все микросервисы автоматически регистрируются в Eureka:
-- `user-service` (порт 8001)
-- `stock-service` (порт 8002)
-- `price-service` (порт 8003)
-- `tinkoff-stock-service` (порт 8004)
-- `api-gateway` (порт 8090)
+12 Eureka-клиентов из корневого `pom.xml` (исключая `fs-trading-core` — shared jar, и `EurekaServer` — registry):
+
+| Модуль | Eureka name | Порт |
+|--------|-------------|------|
+| UserService | `user-service` | 8001 |
+| PriceService | `price-service` | 8003 |
+| BrokerIntegrationService | `broker-integration-service` | 8004 |
+| AnalyticsService | `analytics-service` | 8005 |
+| TradingTerminalService | `trading-terminal-service` | 8006 |
+| TradingBotService | `trading-bot-service` | 8007 |
+| AdminPanelService | `admin-panel-service` | 8008 |
+| DashboardService | `dashboard-service` | 8009 |
+| MarketHistoryService | `market-history-service` | 8010 |
+| BotOptimizationService | `bot-optimization-service` | 8011 |
+| JournalService | `journal-service` | 8012 |
+| ApiGateway | `api-gateway` | 8090 |
+
+Порты — из `application.yml` каждого модуля.
 
 ## Использование Service Discovery
 
-Сервисы используют имена сервисов вместо прямых URL:
-- Вместо `http://stock-service:8002` используется `lb://stock-service`
-- Spring Cloud LoadBalancer автоматически находит доступные экземпляры
-- Поддерживается балансировка нагрузки при наличии нескольких экземпляров
+Сервисы обращаются друг к другу по имени, не по прямому URL:
+
+- `lb://trading-terminal-service` вместо `http://localhost:8006`
+- Spring Cloud LoadBalancer выбирает доступный экземпляр
+- Поддерживается балансировка при нескольких репликах
 
 ## Health Checks
 
-Eureka автоматически отслеживает состояние сервисов:
-- Сервисы отправляют heartbeat каждые 30 секунд
-- Недоступные сервисы автоматически удаляются из реестра
-- При восстановлении сервисы автоматически регистрируются снова
-
+- Heartbeat каждые 30 секунд (`lease-renewal-interval-in-seconds`)
+- Недоступные инстансы удаляются из реестра
+- При восстановлении сервис регистрируется снова

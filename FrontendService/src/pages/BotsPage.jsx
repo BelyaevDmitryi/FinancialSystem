@@ -13,6 +13,8 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  FormControlLabel,
+  Checkbox,
   Table,
   TableBody,
   TableCell,
@@ -39,6 +41,7 @@ const BotsPage = () => {
     strategy: 'MACD_CROSSOVER',
     ticker: '',
     maxPositionSize: '',
+    paper: true,
   })
 
   useEffect(() => {
@@ -103,9 +106,10 @@ const BotsPage = () => {
         strategy: formData.strategy,
         figi: figi,
         maxPositionSize: parseFloat(formData.maxPositionSize),
+        paper: formData.paper,
       })
       setOpenDialog(false)
-      setFormData({ name: '', strategy: 'MACD_CROSSOVER', ticker: '', maxPositionSize: '' })
+      setFormData({ name: '', strategy: 'MACD_CROSSOVER', ticker: '', maxPositionSize: '', paper: true })
       fetchBots()
     } catch (err) {
       let errorMessage = 'Не удалось создать бота'
@@ -118,6 +122,8 @@ const BotsPage = () => {
           .join('; ')
       } else if (typeof data?.detail === 'string') {
         errorMessage = data.detail
+      } else if (typeof data?.error === 'string') {
+        errorMessage = data.error
       } else if (err.response?.status === 404) {
         errorMessage = 'Акция с таким тикером не найдена'
       } else if (err.message) {
@@ -197,6 +203,7 @@ const BotsPage = () => {
               <TableCell>Стратегия</TableCell>
               <TableCell>FIGI</TableCell>
               <TableCell>Макс. размер позиции</TableCell>
+              <TableCell>Paper</TableCell>
               <TableCell>Прибыль</TableCell>
               <TableCell>Сделок</TableCell>
               <TableCell>Статус</TableCell>
@@ -206,7 +213,7 @@ const BotsPage = () => {
           <TableBody>
             {bots.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} align="center">
+                <TableCell colSpan={9} align="center">
                   <Typography color="textSecondary">
                     Нет ботов
                   </Typography>
@@ -219,6 +226,14 @@ const BotsPage = () => {
                   <TableCell>{bot.strategy}</TableCell>
                   <TableCell>{bot.figi || '-'}</TableCell>
                   <TableCell>{bot.maxPositionSize ? bot.maxPositionSize.toFixed(2) : '-'}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={bot.paper ? 'Paper' : 'Live'}
+                      color={bot.paper ? 'info' : 'warning'}
+                      size="small"
+                      variant="outlined"
+                    />
+                  </TableCell>
                   <TableCell>{bot.totalProfit ? bot.totalProfit.toFixed(2) : '0.00'}</TableCell>
                   <TableCell>{bot.totalTrades || 0}</TableCell>
                   <TableCell>
@@ -289,6 +304,15 @@ const BotsPage = () => {
               required
               inputProps={{ min: 0, step: 0.01 }}
               helperText="Максимальная сумма для одной позиции"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formData.paper}
+                  onChange={(e) => setFormData({ ...formData, paper: e.target.checked })}
+                />
+              }
+              label="Paper trading (без реальных ордеров у брокера)"
             />
           </Box>
         </DialogContent>
